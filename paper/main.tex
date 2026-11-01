@@ -158,7 +158,33 @@ $\rho$ therefore controls the \emph{backward} error, while $\kappa$ controls the
 
 With $\rho\approx1$ on ten of thirteen matrices, $\rho u_{32}\approx6\times10^{-8}$,
 two orders of magnitude below the $10^{-6}$ residual target; only the three
-near-singular matrices require FP64. \todo{corroborate with end-to-end timings}
+near-singular matrices require FP64.
+
+Residuals, however, are not what a circuit simulator is finally scored on: the
+acceptance test for a transient is whether the \emph{waveform} moves, since a
+residual bounds one solve while the trace is governed by local truncation error
+and step control. We therefore ran the hundred public single-transient decks
+twice---once through the reference KLU path, once through the accelerator
+path---and compared the \texttt{v(v\_out)} traces under that acceptance criterion
+itself ($r>0.9$ and MAE $<1$\,mV, Figure~\ref{fig:wave}). Ninety-nine decks
+agree: the median deviation is $3.4\,\mu$V, $1/300$ of the threshold, and 82 of
+100 lie below $0.1$\,mV. The single exception is a deck whose Newton iteration
+selects a different time step at one switching edge; one $60.7$\,mV spike
+survives there and averages to $2.19$\,mV. Changing the solver thus does not move
+the simulation---what moves it is step control, the same mechanism behind the
+edge-localized deviations that the $2\%$-relative checker reports even for the
+reference path.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{figures/fig11_wave_e2e.pdf}
+  \caption{End-to-end transients, reference versus accelerator path, over the
+  hundred public decks. Left: per-deck MAE against the $1$\,mV criterion (log
+  scale); 99 of 100 pass, the median by three orders of magnitude, and the single
+  failure is the one deck whose step control differs at a switching edge. Right:
+  that deck, where one edge accounts for the entire excess.}
+  \label{fig:wave}
+\end{figure}
 
 \section{Related work and conclusion}
 

@@ -1,0 +1,155 @@
+case	ok	unavail	refine_div	klu_fb	solves	adopt_pct
+test_001_tran	1308	69	65	138	1377	94.99
+test_002_tran	1215	64	58	128	1279	95.00
+test_003_tran	937	33	33	66	970	96.60
+test_004_tran	1039	90	82	180	1129	92.03
+test_005_tran	1188	77	73	154	1265	93.91
+test_006_tran	1011	71	59	142	1082	93.44
+test_007_tran	1129	90	85	180	1219	92.62
+test_008_tran	1139	67	59	134	1206	94.44
+test_009_tran	1203	50	45	100	1253	96.01
+test_010_tran	1104	31	30	62	1135	97.27
+test_011_tran	1060	36	34	72	1096	96.72
+test_012_tran	1135	59	55	118	1194	95.06
+test_013_tran	1330	69	68	138	1399	95.07
+test_014_tran	1284	69	68	138	1353	94.90
+test_015_tran	1121	80	79	160	1201	93.34
+test_016_tran	1116	63	59	126	1179	94.66
+test_017_tran	1224	64	56	128	1288	95.03
+test_018_tran	1176	59	52	118	1235	95.22
+test_019_tran	1266	56	52	112	1322	95.76
+test_020_tran	1023	57	54	114	1080	94.72
+test_021_tran	1011	71	59	142	1082	93.44
+test_022_tran	1203	51	48	102	1254	95.93
+test_023_tran	1011	71	59	142	1082	93.44
+test_024_tran	1084	63	57	126	1147	94.51
+test_025_tran	1051	84	79	168	1135	92.60
+test_026_tran	1199	70	65	140	1269	94.48
+test_027_tran	1211	51	51	102	1262	95.96
+test_028_tran	1259	116	110	232	1375	91.56
+test_029_tran	1129	69	68	138	1198	94.24
+test_030_tran	1286	61	57	122	1347	95.47
+test_031_tran	1295	30	29	60	1325	97.74
+test_032_tran	1015	25	24	50	1040	97.60
+test_033_tran	1205	58	56	116	1263	95.41
+test_034_tran	1154	81	75	162	1235	93.44
+test_035_tran	1223	34	31	68	1257	97.30
+test_036_tran	1266	28	28	56	1294	97.84
+test_037_tran	1099	38	37	76	1137	96.66
+test_038_tran	1143	61	57	122	1204	94.93
+test_039_tran	1106	37	35	74	1143	96.76
+test_040_tran	1071	59	56	118	1130	94.78
+test_041_tran	1148	93	87	186	1241	92.51
+test_042_tran	1207	38	38	76	1245	96.95
+test_043_tran	1222	51	47	102	1273	95.99
+test_044_tran	934	48	47	96	982	95.11
+test_045_tran	1082	42	40	84	1124	96.26
+test_046_tran	1267	88	80	176	1355	93.51
+test_047_tran	1039	90	82	180	1129	92.03
+test_048_tran	1015	50	46	100	1065	95.31
+test_049_tran	1147	47	41	94	1194	96.06
+test_050_tran	1073	88	83	176	1161	92.42
+test_051_tran	938	68	63	136	1006	93.24
+test_052_tran	1217	57	54	114	1274	95.53
+test_053_tran	1206	66	65	132	1272	94.81
+test_054_tran	1147	68	57	136	1215	94.40
+test_055_tran	1392	60	58	120	1452	95.87
+test_056_tran	1060	58	53	116	1118	94.81
+test_057_tran	1223	70	65	140	1293	94.59
+test_058_tran	1230	54	52	108	1284	95.79
+test_059_tran	1175	48	47	96	1223	96.08
+test_060_tran	1191	63	61	126	1254	94.98
+test_061_tran	1176	32	32	64	1208	97.35
+test_062_tran	1167	49	47	98	1216	95.97
+test_063_tran	991	56	49	112	1047	94.65
+test_064_tran	1114	101	96	202	1215	91.69
+test_065_tran	1266	92	90	184	1358	93.23
+test_066_tran	998	132	127	264	1130	88.32
+test_067_tran	1240	91	89	182	1331	93.16
+test_068_tran	879	63	56	126	942	93.31
+test_069_tran	1170	62	58	124	1232	94.97
+test_070_tran	1251	46	42	92	1297	96.45
+test_071_tran	1321	31	29	62	1352	97.71
+test_072_tran	1147	68	60	136	1215	94.40
+test_073_tran	1022	78	73	156	1100	92.91
+test_074_tran	1170	58	58	116	1228	95.28
+test_075_tran	1178	39	35	78	1217	96.80
+test_076_tran	1067	81	80	162	1148	92.94
+test_077_tran	1191	78	75	156	1269	93.85
+test_078_tran	1217	57	54	114	1274	95.53
+test_079_tran	1148	73	72	146	1221	94.02
+test_080_tran	1032	39	37	78	1071	96.36
+test_081_tran	1224	87	82	174	1311	93.36
+test_082_tran	1330	59	58	118	1389	95.75
+test_083_tran	1090	65	60	130	1155	94.37
+test_084_tran	1147	64	61	128	1211	94.72
+test_085_tran	1106	32	29	64	1138	97.19
+test_086_tran	935	25	24	50	960	97.40
+test_087_tran	1137	47	43	94	1184	96.03
+test_088_tran	1278	52	52	104	1330	96.09
+test_089_tran	1168	46	45	92	1214	96.21
+test_090_tran	980	58	54	116	1038	94.41
+test_091_tran	1039	90	82	180	1129	92.03
+test_092_tran	1144	48	43	96	1192	95.97
+test_093_tran	1234	68	63	136	1302	94.78
+test_094_tran	1081	65	59	130	1146	94.33
+test_095_tran	1211	40	39	80	1251	96.80
+test_096_tran	1247	47	44	94	1294	96.37
+test_097_tran	1009	71	63	142	1080	93.43
+test_098_tran	1211	40	39	80	1251	96.80
+test_099_tran	1221	48	47	96	1269	96.22
+test_100_tran	1175	51	51	102	1226	95.84
+
+# overall: solves=120742 gpu_ok=114654 adopt=94.96%
+# cases with adopt<95%: 51
+#   test_001_tran adopt=94.99% solves=1377
+#   test_002_tran adopt=95.00% solves=1279
+#   test_004_tran adopt=92.03% solves=1129
+#   test_005_tran adopt=93.91% solves=1265
+#   test_006_tran adopt=93.44% solves=1082
+#   test_007_tran adopt=92.62% solves=1219
+#   test_008_tran adopt=94.44% solves=1206
+#   test_014_tran adopt=94.90% solves=1353
+#   test_015_tran adopt=93.34% solves=1201
+#   test_016_tran adopt=94.66% solves=1179
+#   test_020_tran adopt=94.72% solves=1080
+#   test_021_tran adopt=93.44% solves=1082
+#   test_023_tran adopt=93.44% solves=1082
+#   test_024_tran adopt=94.51% solves=1147
+#   test_025_tran adopt=92.60% solves=1135
+#   test_026_tran adopt=94.48% solves=1269
+#   test_028_tran adopt=91.56% solves=1375
+#   test_029_tran adopt=94.24% solves=1198
+#   test_034_tran adopt=93.44% solves=1235
+#   test_038_tran adopt=94.93% solves=1204
+#   test_040_tran adopt=94.78% solves=1130
+#   test_041_tran adopt=92.51% solves=1241
+#   test_046_tran adopt=93.51% solves=1355
+#   test_047_tran adopt=92.03% solves=1129
+#   test_050_tran adopt=92.42% solves=1161
+#   test_051_tran adopt=93.24% solves=1006
+#   test_053_tran adopt=94.81% solves=1272
+#   test_054_tran adopt=94.40% solves=1215
+#   test_056_tran adopt=94.81% solves=1118
+#   test_057_tran adopt=94.59% solves=1293
+#   test_060_tran adopt=94.98% solves=1254
+#   test_063_tran adopt=94.65% solves=1047
+#   test_064_tran adopt=91.69% solves=1215
+#   test_065_tran adopt=93.23% solves=1358
+#   test_066_tran adopt=88.32% solves=1130
+#   test_067_tran adopt=93.16% solves=1331
+#   test_068_tran adopt=93.31% solves=942
+#   test_069_tran adopt=94.97% solves=1232
+#   test_072_tran adopt=94.40% solves=1215
+#   test_073_tran adopt=92.91% solves=1100
+#   test_076_tran adopt=92.94% solves=1148
+#   test_077_tran adopt=93.85% solves=1269
+#   test_079_tran adopt=94.02% solves=1221
+#   test_081_tran adopt=93.36% solves=1311
+#   test_083_tran adopt=94.37% solves=1155
+#   test_084_tran adopt=94.72% solves=1211
+#   test_090_tran adopt=94.41% solves=1038
+#   test_091_tran adopt=92.03% solves=1129
+#   test_093_tran adopt=94.78% solves=1302
+#   test_094_tran adopt=94.33% solves=1146
+#   test_097_tran adopt=93.43% solves=1080

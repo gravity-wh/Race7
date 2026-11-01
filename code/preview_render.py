@@ -92,14 +92,36 @@ class Canvas:
                     chunk(b"IDAT", zlib.compress(raw, 6)) + chunk(b"IEND", b""))
 
 
+def _collect_offsets(root):
+    """把 <g transform="translate(dx,dy)"> 的位移累加到每个后代元素上。"""
+    off = {}
+
+    def walk(el, dx, dy):
+        t = el.get("transform") or ""
+        m = re.search(r"translate\(\s*(-?[\d.]+)[ ,]+(-?[\d.]+)\s*\)", t)
+        if m:
+            dx += float(m.group(1))
+            dy += float(m.group(2))
+        off[id(el)] = (dx, dy)
+        for ch in el:
+            walk(ch, dx, dy)
+
+    walk(root, 0.0, 0.0)
+    return off
+
+
 def render(path, out, scale=1.0):
     tree = ET.parse(path).getroot()
     W = int(float(tree.get("width")) * scale)
     H = int(float(tree.get("height")) * scale)
     cv = Canvas(W, H)
+    off = _collect_offsets(tree)
     for el in tree.iter():
         tag = el.tag.replace(NS, "")
+        dx, dy = off.get(id(el), (0.0, 0.0))
         g = lambda k, d="0": float(el.get(k, d) or d)
+        X = lambda k, d="0": float(el.get(k, d) or d) + dx
+        Y = lambda k, d="0": float(el.get(k, d) or d) + dy
         stroke = hex2rgb(el.get("stroke"), (150, 150, 150))
         fill = el.get("fill")
         if tag == "rect":
@@ -114,34 +136,34 @@ def render(path, out, scale=1.0):
             else:
                 h_ = float(rh)
             if fill and fill != "none":
-                cv.rect(g("x") * scale, g("y") * scale, w_ * scale,
+                cv.rect(X("x") * scale, Y("y") * scale, w_ * scale,
                         h_ * scale, hex2rgb(fill))
             if el.get("stroke") and el.get("stroke") != "none":
-                cv.rect(g("x") * scale, g("y") * scale, w_ * scale,
+                cv.rect(X("x") * scale, Y("y") * scale, w_ * scale,
                         h_ * scale, stroke, fill=False)
         elif tag == "line":
-            cv.line(g("x1") * scale, g("y1") * scale, g("x2") * scale, g("y2") * scale,
+            cv.line(X("x1") * scale, Y("y1") * scale, X("x2") * scale, Y("y2") * scale,
                     stroke, max(1.0, g("stroke-width", "1") * scale))
         elif tag == "path":
             d = el.get("d", "")
             toks = re.findall(r'([ML])(-?[\d.]+),(-?[\d.]+)', d)
             prev = None
             for _, xs, ys in toks:
-                p = (float(xs) * scale, float(ys) * scale)
+                p = ((float(xs) + dx) * scale, (float(ys) + dy) * scale)
                 if prev:
                     cv.line(prev[0], prev[1], p[0], p[1], stroke,
                             max(1.0, g("stroke-width", "1") * scale))
                 prev = p
         elif tag == "circle":
-            cv.circle(g("cx") * scale, g("cy") * scale, max(1.0, g("r") * scale),
+            cv.circle(X("cx") * scale, Y("cy") * scale, max(1.0, g("r") * scale),
                       stroke, fill=False, w=2.0)
         elif tag == "text":
             txt = (el.text or "")
             fs = g("font-size", "12") * scale
             anchor = el.get("text-anchor", "start")
             est = sum(fs * (1.0 if ord(c) > 127 else 0.56) for c in txt)
-            x = g("x") * scale
-            y = g("y") * scale
+            x = X("x") * scale
+            y = Y("y") * scale
             if anchor == "middle":
                 x -= est / 2
             elif anchor == "end":
