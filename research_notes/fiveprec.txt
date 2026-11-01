@@ -1,0 +1,1679 @@
+                             Five-Precision GMRES-basediterative re昀椀nement
+                   Patrick Amestoy, Alfredo Buttari, Nicholas Higham, Jean-Yves L’excellent, Theo
+                                                            Mary, Bastien Vieublé
+                    Tocitethis version:
+                   Patrick Amestoy, Alfredo Buttari, Nicholas Higham, Jean-Yves L’excellent, Theo Mary, et al.. Five-Precision
+                   GMRES-basediterative re昀椀nement. SIAM Journal on Matrix Analysis and Applications, 2024, 45 (1), pp.529–
+                   552. ⟨10.1137/23M1549079⟩. ⟨hal-03190686v2⟩
+                                                       HALId: hal-03190686
+                                             https://hal.science/hal-03190686v2
+                                                          Submitted on 1 Apr 2024
+                  HALisamulti-disciplinary open access archive               L’archiveouvertepluridisciplinaireHAL,estdes-
+              for the deposit and dissemination of scienti昀椀c re-        tinée au dépôt et à la di昀昀usion de documents scien-
+              searchdocuments,whethertheyarepublishedornot. ti昀椀quesdeniveaurecherche,publiésounon,émanant
+              Thedocumentsmaycomefromteachingandresearch des établissements d’enseignement et de recherche
+              institutions in France or abroad, or from public or pri-   français ou étrangers, des laboratoires publics ou
+              vate research centers.                                     privés.
+                                                             HALAuthorization
+                       FIVE-PRECISION GMRES-BASED ITERATIVE REFINEMENT ∗
+                                                                              !                            §
+                             PATRICK AMESTOY , ALFREDO BUTTARI , NICHOLAS J. HIGHAM ,
+                                                                             ¶                            ´§
+                              JEAN-YVES L’EXCELLENT , THEO MARY , AND BASTIEN VIEUBLE
+                        Abstract. GMRES-based iterative re昀椀nement in three precisions (GMRES-IR3), proposed by
+                    Carson and Higham in 2018, uses a low precision LU factorization to accelerate the solution of
+                    a linear system without compromising numerical stability or robustness. GMRES-IR3 solves the
+                    update equation of iterative re昀椀nement using GMRES preconditioned by the LU factors, where all
+                    operations within GMRES are carried out in the working precision u, except for the matrix-vector
+                                                                                                                    2
+                    products and the application of the preconditioner, which require the use of extra precision u .
+                    The use of extra precision can be expensive, and is especially unattractive if it is not available
+                    in hardware; for this reason, existing implementations have not used extra precision, despite the
+                    absence of an error analysis for this approach. In this article, we propose to relax the requirements
+                    on the precisions used within GMRES, allowing the use of arbitrary precisions u for applying the
+                                                                                                    p
+                    preconditioned matrix3vector product and u for the rest of the operations. We obtain the 昀椀ve-
+                                                                g
+                    precision GMRES-based iterative re昀椀nement (GMRES-IR5) algorithm which has the potential to
+                    solve relatively badly conditioned problems in less time and memory than GMRES-IR3. We develop
+                    a rounding error analysis that generalizes that of GMRES-IR3, obtaining conditions under which
+                    the forward and backward errors converge to their limiting values. Our analysis makes use of a new
+                    result on the backward stability of MGS-GMRES in two precisions. On hardware where three or more
+                    arithmetics are available, which is becoming very common, the number of possible combinations of
+                    precisions in GMRES-IR5 is extremely large. We provide an analysis of our theoretical results that
+                    identi昀椀es a relatively small subset of relevant combinations. By choosing from within this subset
+                    one can achieve di昀昀erent levels of tradeo昀昀 between cost and robustness, which allows for a 昀椀ner
+                    choice of precisions depending on the problem di昀케culty and the available hardware. We carry out
+                    numerical experiments on random dense and SuiteSparse matrices to validate our theoretical analysis
+                    and discuss the complexity of GMRES-IR5.
+                        Key words. iterative re昀椀nement, GMRES, linear system, mixed precision, multiple precision,
+                    rounding error analysis, 昀氀oating-point arithmetic, backward error, forward error, preconditioning
+                        AMSsubject classi昀椀cations. 65G50, 65F05, 65F08, 65F50, 65F10
+                        1. Introduction. Modernhardwareincreasinglysupportslowprecision昀氀oating-
+                    point arithmetics that provide unprecedented speed, communication, and energy ben-
+                    e昀椀ts. This has generated renewed interest in mixed precision algorithms that combine
+                    these lower precision arithmetics with higher precision ones to achieve both high per-
+                    formance and high accuracy [19]. Among such mixed precision algorithms, iterative
+                    re昀椀nement for the solution of a linear system Ax = b is one of the oldest and most
+                    successful [3], [14, Chap. 12], [25], [30].
+                        We recall, in Algorithm 1.1, the iterative re昀椀nement recently proposed and an-
+                    alyzed by Carson and Higham [5]. Algorithm 1.1 includes and generalizes previous
+                    iterative re昀椀nement algorithms in two ways. First, each step of the ith iteration of
+                    the algorithm may be carried out in a di昀昀erent precision: the initial LU factorization
+                       ∗Version of November 1, 2023.
+                        Funding: The work of the third author was supported by Engineering and Physical Sciences
+                    Research Council grant EP/P020720/1, the Royal Society, and the Exascale Computing Project
+                    (17-SC-20-SC), a collaborative e昀昀ort of the U.S. Department of Energy O昀케ce of Science and the
+                    National Nuclear Security Administration..
+                        Mumps     Technologies,    ENS Lyon,       46   All´ee  d’Italie,  F-69007    Lyon,    France
+                    (patrick.amestoy@mumps-tech.com; jean-yves.l.excellent@mumps-tech.com)
+                       !CNRS, IRIT, 2 Rue Charles Camichel, F-31071 Toulouse, France (alfredo.buttari@irit.fr)
+                       §Department of Mathematics, The University of Manchester, Manchester, M13 9PL, UK
+                    (nick.higham@manchester.ac.uk; bastien.vieuble@manchester.ac.uk)
+                      ¶Sorbonne Universit´e, CNRS, LIP6, Paris, F-75005, France (theo.mary@lip6.fr)
+                                                                    1
+                 Algorithm 1.1 Iterative re昀椀nement
+                 Input: an n×n matrix A and a right-hand side b.
+                 Output: an approximate solution to Ax = b.
+                   1: Compute the LU factorization A = LU.                       u
+                                                                                  f
+                   2: Initialize x (to, e.g., U−1L−1b).                          u
+                                0                                                 f
+                   3: for i = 0,..., converged do
+                   4:   Compute r =b−Ax .                                        u
+                                   i          i                                   r
+                   5:   Solve Ad = r .                                           u
+                                 i    i                                           s
+                   6:   Compute x      =x +d.                                    u
+                                   i+1     i   i
+                   7: end for
+                 of A is performed in precision u , the residual r = b − Ax is computed in precision
+                                                  f               i          i
+                 u , and the solution x is updated in the target, working precision u. Second, the
+                   r                     i
+                 correction term d is obtained by solving the system Ad = r with a generic solver
+                                   i                                       i     i
+                 assumed to compute d with relative accuracy of order u g u. The precision u is a
+                                        i                                  s                      s
+                 measure of the quality of the solution the solver produces rather than an input to the
+                 solver.
+                      The traditional choice of solver, which we call the LU solver, is to compute
+                         −1 −1
+                 d = U L r by substitution in precision u , so that d is computed at accuracy
+                   i            i                                f           i
+                 u =O(u ). In this case, Algorithm 1.1 employs up to three precisions. We denote
+                   s       f
+                 this variant by LU-IR3. While LU-IR3 can be very attractive for well-conditioned ma-
+                 trices, it is only guaranteed to converge when »(A)u j 1, where »(A) = ∥A∥∥A−1∥
+                                                                      f
+                 denotes the condition number of A and “j” means “is su昀케ciently less than”. This
+                 condition can be quite restrictive, especially when low precision arithmetic is used for
+                 the factorization: for example, the condition becomes »(A) j 2 × 103 with IEEE
+                 fp16 (half) precision, and »(A) j 3×102 with b昀氀oat16.
+                      CarsonandHigham[4]takeu =uandsolveAd =r byGMRESpreconditioned
+                                                   f                  i    i
+                 by the computed LU factors of A, with the preconditioner and the matrix3vector
+                                                                 2
+                 product with A applied in higher precision u and the residual also computed at
+                                          2
+                 higher precision, u = u . Their motivation was to compute solutions with forward
+                                    r
+                                                              −1
+                 error of order u even when »(A) is of order u   . Carson and Higham [5] subsequently
+                 generalized this algorithm in order to be able to exploit lower precision arithmetic for
+                 the factorization. This algorithm, called GMRES-based iterative re昀椀nement in three
+                                                                                      e
+                 precisions (GMRES-IR3), is recalled in Algorithm 1.2. On line 5, A is not explicitly
+                 formed, but its action on a vector in the Arnoldi process of the GMRES algorithm
+                 is obtained with a matrix multiplication followed by a forward substitution and a
+                 backward substitution corresponding to the L and U factors, respectively.
+                                                                                               2 2
+                      GMRES-IR3isshownin[5]tobeguaranteedtoconvergeaslongas»(A) u u j
+                                                                                                 f
+                 1, and it is therefore able to handle much more ill-conditioned matrices than LU-IR3.
+                 However, the requirement that the preconditioned matrix3vector product be applied
+                               2
+                 in precision u is a practical limitation, because this can be expensive; it is particu-
+                 larly inconvenient if the target accuracy u is double precision, as it requires applying
+                 the preconditioner and the matrix3vector product with A in quadruple precision, an
+                 arithmetic that is not natively supported on most modern hardware and is an order of
+                 magnitude slower than double precision when implemented in software [15]. In fact,
+                 practical implementations of GMRES-IR3, as developed in [1], [10], [11], [12] and
+                 implemented in the MAGMA library [24] and the NVIDIA cuSOLVER library [8],
+                 have relaxed this requirement by applying the preconditioned matrix3vector product
+                                                            2
+                  Algorithm1.2 GMRESbasediterativere昀椀nementinthreeprecisions(GMRES-IR3)
+                  Input: an n×n matrix A and a right-hand side b.
+                  Output: Approximate solution xb to Ax = b
+                   1: Compute the LU factorization A = LU.                           u
+                                                                                      f
+                                               −1 −1
+                   2: Initialize x (e.g., to U   L b).                               u
+                                  0                                                   f
+                   3: for i = 0,..., converged do
+                   4:    Compute r =b−Ax .                                           u
+                                    i           i                                     r
+                   5:    Solve U−1L−1Ad = U−1L−1r by GMRES at precision u with matrix3vector
+                                           i             i
+                                         e     −1 −1                               2
+                         products with A = U      L Acomputed at precision u .
+                   6:    Compute x       =x +d.                                      u
+                                     i+1     i    i
+                   7: end for
+                  in double rather than quadruple precision4even though the error analysis of [5] does
+                  not cover this case. GMRES-IR variants for symmetric positive de昀椀nite systems and
+                  least squares problems have also allowed just two precisions to be used [6], [20]. The
+                  question arises of whether we can use a lower precision to compute the preconditioned
+                  matrix3vector product within GMRES and still obtain a GMRES-IR solver able to
+                  handle more ill-conditioned matrices than LU-IR.
+                       These practical constraints and theoretical questions lead us to propose new vari-
+                  ants of GMRES-basediterativere昀椀nementwithrelaxedrequirementsontheprecisions
+                  used within the GMRES solver. We allow the preconditioner (the LU factors) and
+                  the matrix3vector product with A to be applied in an arbitrary precision u , with
+                                                                                                     p
+                         2
+                  u gu . We also allow the rest of the GMRES computations to be performed in an
+                    p
+                  arbitrary precision u , with u g u. We obtain Algorithm 3.1, which has up to 昀椀ve
+                                        g         g
+                  independent precisions in play and which we thus call GMRES-IR5. We generalize the
+                  rounding error analysis of Carson and Higham [4], [5] to this new GMRES-IR5 variant
+                  and obtain several novel combinations of precision parameters that achieve di昀昀erent
+                  levels of tradeo昀昀 between cost and robustness. We summarize the conclusions of this
+                  analysis in Theorems 3.1 and 3.2 which give, respectively, a bound on the backward
+                  error of MGS-GMRESusinganarbitrarymatrix3vectorproductandconditionsunder
+                  which the forward error and backward error of GMRES-IR5 achieve certain limiting
+                  values. GMRES-IR5 therefore 昀椀lls the gap between LU-IR3 and GMRES-IR3, allow-
+                  ing for new variants that can be much faster than GMRES-IR3 but that remain more
+                  robust than LU-IR3. When multiple arithmetics are available (for example, current
+                  supercomputers commonly support b昀氀oat16, fp16, fp32 and fp64), the number of pos-
+                  sible combinations is extremely large; based on our analysis and the resulting error
+                  bounds, we provide recipes to trim the space of possible combinations down to a rel-
+                  atively small subset of relevant ones. These include combinations where u = u and,
+                                                                                                 p
+                  therefore, our results provide convergence guarantees for the existing implementations
+                  mentioned above.
+                       Note that even though GMRES-IR5 has 昀椀ve precisions parameters in play, this
+                  does not mean that it uses 昀椀ve di昀昀erent arithmetics at the same time, since some of
+                  the precisions can be equal. In fact, most of the relevant combinations of precisions
+                  identi昀椀ed by our analysis use only two or three di昀昀erent precisions. Nevertheless, we
+                  discover some meaningful variants that employ, for the 昀椀rst time, four or even 昀椀ve
+                  di昀昀erent precisions in the same re昀椀nement step. (We specify “in the same re昀椀nement
+                  step” because dynamically changing the precisions from one iteration to another could
+                  already lead to such a number of di昀昀erent precisions across all steps, and even more
+                                                               3
+                in the case of arbitrary precision re昀椀nement [22], [23]).
+                    Therestofthis article is organized as follows. We begin, in section 2, by providing
+                technical background on LU-IR3 and GMRES-IR3. In section 3, we present the gen-
+                eralized error analysis of GMRES-IR5 in 昀椀ve precisions and its di昀昀erent combinations.
+                In section 4, we support our analysis with numerical experiments on random dense
+                matrices and matrices from the SuiteSparse collection [?]. In section 5, we discuss the
+                complexity of GMRES-IR5. We provide our concluding remarks in section 6.
+                    2. Preliminaries on LU-IR3 and GMRES-IR3. In this section we sum-
+                marize our notation and assumptions for the analysis, and brie昀氀y recall the essen-
+                tial technical background on the LU-IR3 and GMRES-IR3 algorithms of Carson and
+                Higham [4, 5].
+                    Weuse the standard model of 昀氀oating-point arithmetic [14, sect. 2.2] and we use
+                the notation fl(·) to denote the computed value of a given expression. For any integer
+                k we de昀椀ne
+                                                 µ = ku .
+                                                  k   1−ku
+                Asuperscript on µ denotes that u carries that superscript as a subscript; thus µf =
+                                                                                           k
+                ku /(1 − ku ), for example. We also use the notation µe  = µ    to hide modest
+                  f         f                                          k     ck
+                constants c.
+                    The error bounds obtained by our analysis depend on the problem dimension n,
+                the maximum number of iterations k of GMRES over all iterative re昀椀nement steps,
+                and the growth factor Än of the LU factorization. In parts of the analysis, we will
+                gather these constants into a generic function f(n,k,Ä ). The constants depending on
+                                                                 n
+                nare known to be pessimistic [7], [17], [18] and, with standard pivoting strategies, Än
+                is almost always small in practice and of order a constant [14, chap. 9] (for exceptions,
+                see [13]). Therefore, for the sake of the readability, we do not always keep track of the
+                precise value of f(n,k,Ä ). When we drop constants f(n,k,Ä ) from an inequality we
+                                      n                                 n
+                write the inequality using “j”. A convergence condition expressed as “»(A) j ¹”
+                can be read as “»(A) is su昀케ciently less than ¹”. Finally, we also use the notation ≲
+                and ≈ when dropping negligible second order terms in the error bounds; we note that
+                what makes a second-order term negligible depends on the local context: for example,
+                          2                                                 2
+                the term u is not necessarily negligible in the expression u + u , but can be safely
+                          f                                                 f
+                                                 2
+                dropped from the expression u +u .
+                                            f    f
+                    Wewillalsomakeuseofthenotation≡whichmeansthatwecantakethequantity
+                on the left, which is in our control and is not 昀椀xed, to be equal to the quantity on the
+                right.
+                    We consider linear systems Ax = b, where A ∈ Rn×n is nonsingular and b ∈
+                Rn. The forward error of an approximation xb is ∥x − xb∥/∥x∥, while the (normwise)
+                backward error of xb is [14, sec. 7.1]                          ∥b−Axb∥    .
+                   min{ϵ : (A+∆A)xb=b+∆b, ∥∆A∥fϵ∥A∥, ∥∆b∥fϵ∥b∥}= ∥A∥∥xb∥+∥b∥
+                Wede昀椀ne the componentwise condition numbers
+                                              −1
+                              cond(A,x) = ∥|A    ||A||x|∥, cond(A) = ∥|A−1||A|∥,
+                                                ∥x∥
+                where |A| = (|a |).
+                              ij
+                    Our error analysis uses both the ∞-norm and the Frobenius norm, denoted by
+                ∥·∥   and ∥·∥ , respectively, and we write » (A) and » (A) for the corresponding
+                   ∞          F                           ∞          F
+                                                       4
+                condition numbers of A. We will use unsubscripted norms or condition numbers
+                when the constants depending on the problem dimensions have been dropped, since
+                the norms are equivalent.
+                    We denote by q the maximum number of nonzeros in any row of [Ab]; thus
+                q = n+1 for a dense matrix A and a vector b. As in [5], however, we do not make
+                any assumptions on the sparsity of the LU factors L and U.
+                    Carson and Higham [5] perform the error analysis of Algorithm 1.1 with a general
+                solver used at step 5. The solver is assumed to satisfy the conditions
+                                   b
+                                   d =(I+u E)d , u ∥E ∥ <1,                                (2.1a)
+                                    i        s  i  i    s  i ∞
+                                          b                  b
+                                   ∥rb −Ad ∥   fu (c ∥A∥ ∥d ∥ +c ∥rb∥ ),                   (2.1b)
+                                     i     i ∞     s 1    ∞ i ∞       2  i ∞
+                       b
+                whered andrb denotethecomputedd andr , andwhereE , c , andc , are functions
+                       i      i                     i      i            i  1      2
+                of n, A, rb, and u . These conditions are needed for the normwise forward and
+                          i        s
+                backward error analyses, respectively.
+                    In analyzing iterative re昀椀nement we aim to show that the forward error and
+                backward error decrease until they reach a certain size called the limiting forward
+                error or backward error (sometimes also called the attainable accuracy). We will
+                informally refer to attainment of this level as “convergence”, while recognizing that
+                the error does not necessarily converge in the formal sense.
+                    Corollary 3.3 of [5] shows that as long as
+                                                  u ∥E ∥ j1                                 (2.2)
+                                                    s  i
+                for each i, the forward error converges to a limiting value of qu cond(A,x)+u. Here,
+                                                                           r
+                we have simpli昀椀ed the convergence condition by ignoring a term that is shown in [5]
+                to be dominated in practice by the left-hand side of (2.2). Corollary 4.2 of [5] shows
+                that if
+                                              u (c »(A)+c ) j1,                             (2.3)
+                                               s  1        2
+                then the backward error converges to a limiting value of qu + u. The convergence
+                                                                          r
+                conditions of Algorithm 1.1 therefore depend only on u , whereas the limiting accuracy
+                                                                   s
+                and backward errors depend on u and u .
+                                                      r
+                    This analysis of Algorithm 1.1 can be used to derive convergence conditions when
+                we specialize the solver at step 5 if this solver meets the assumptions (2.1a) and
+                (2.1b). To do so we only need to compute the left-hand side quantities of (2.2) and
+                (2.3) which are respectively upper bounds on the forward and backward errors of the
+                solver.
+                    In the case of LU-IR3, we have u ≡ u , ∥E ∥   ≡f(n,Ä )» (A), and c = c =
+                                                   s    f    i ∞         n   ∞          1    2
+                f(n,Ä ), so the convergence condition is
+                      n
+                                                            −1
+                                                  »(A) ju ,                                 (2.4)
+                                                            f
+                for both the forward and backward errors.
+                    In the case of GMRES-IR3, that is, Algorithm 1.2, we have instead u ≡ u and
+                                                                                       s
+                                        e                   e   b−1b−1
+                ∥E ∥   ≡f(n,k,Ä )» (A) [4, sec. 3], where A = U     L Ais the matrix precondi-
+                   i ∞           n   ∞            b      b
+                tioned by the computed LU factors L and U. Using the bound
+                                                e          f       2
+                                            » (A)≲(1+µ » (A))                               (2.5)
+                                             ∞             n ∞
+                                                     e
+                from [5, Eq. (8.3)], which shows that A is usually better conditioned than A, (2.2)
+                yields the condition
+                                                         −1/2 −1
+                                               »(A) ju       u ,                            (2.6)
+                                                              f
+                                                        5
+                for the forward error to converge. This is a signi昀椀cantly less restrictive condition than
+                                                                                          e
+                (2.4) for LU-IR3. Similarly, for GMRES-IR3 we can show that c = f(n,k,Ä )∥A∥
+                                                                   e       1          n     ∞
+                and c = f(n,k,Ä )» (A), so that after bounding ∥A∥      with [4, Eq. (3.2)] the
+                     2           n  ∞                                ∞
+                convergence condition (2.3) for the backward error becomes
+                                                       −1/2 −1/2
+                                             »(A) ju      u     ,                        (2.7)
+                                                            f
+                which is also less restrictive than (2.4) when u < uf. Note that the original condition
+                for the backward error proposed in [5] was »(A)u j 1 and is substantially less
+                restrictive than (2.7). The reason for this discrepancy is that in [5] the assumption is
+                made that c1 in (2.3) is of order f(n,k,Än), which is too optimistic in general.
+                   3. Error analysis of GMRES-IR5. In this section we generalize the error
+                analysis of GMRES-IR3 (Algorithm 1.2) [4], [5] to GMRES-IR5, which is de昀椀ned in
+                Algorithm 3.1. First, we extend in section 3.1 the analysis of Paige, Rozloˇzn´ık, and
+                Strakoˇs [27] on the backward stability of MGS-GMRES to arbitrary matrix3vector
+                products satisfying a generic error bound. Second, we use this generalized analysis
+                in section 3.2 to bound the forward and backward errors of the two precision MGS-
+                                                                e               e    b−1b−1
+                GMRES solver used at step 5 for the resolution of Ad = s , where A = U  L A
+                                                                  i    i
+                         b−1b−1
+                and s = U    L r. We then use these bounds in section 3.3 to rewrite (2.2) and
+                     i           i
+                (2.3) to obtain the specialized conditions on »(A) for GMRES-IR5 to converge (note
+                that the limiting backward error and forward error are left unchanged because they
+                only depend on u and u ). Finally, we use these convergence conditions in section 3.4
+                                     r
+                to identify which combinations of precisions are meaningful.
+                Algorithm 3.1 GMRES based iterative re昀椀nement in 昀椀ve precisions (GMRES-IR5)
+                Input: an n×n matrix A and a right-hand side b.
+                Output: Approximate solution xb to Ax = b
+                 1: Compute the LU factorization A = LU.                 u
+                                                                          f
+                 2: Initialize x (to, e.g., U−1L−1b).                    u
+                             0                                            f
+                 3: for i = 0,..., converged do
+                 4:  Compute r =b−Ax .                                   u
+                               i         i                                r
+                            −1 −1         −1 −1
+                 5:  Solve U   L Ad =U L r byGMRESatprecisionu withmatrix3vector
+                                     i           i                        g
+                                   e     −1 −1
+                     products with A = U   L Acomputed at precision u .
+                                                                       p
+                 6:  Compute x     =x +d.                                u
+                                i+1   i    i
+                 7: end for
+                   Our analysis makes use of the following three assumptions on the precisions:
+                     • u g u: since the solution computed by GMRES is stored in the working
+                        g
+                       precision u, we do not expect running GMRES in precision u < u to give a
+                                                                                g
+                       signi昀椀cant bene昀椀t.
+                     • »(A)u < 1: this assumption is already present in the three-precision analy-
+                       sis [5]; here, we use it for various discussions, but it is not required to derive
+                       our new convergence conditions.
+                     • »(A)u <1: this assumption is needed to drop certain second order terms in
+                             p
+                                                         2 2
+                       our analysis. It guarantees that »(A) u is negligible relative to »(A)u .
+                                                            p                           p
+                In addition, as in [5], we also assume that the growth factor Ä of the LU factorization
+                                                                       n
+                is of modest size, which is usually the case when common pivoting strategies are used
+                (e.g., partial pivoting).
+                                                      6
+                                3.1. Error analysis of MGS-GMRESwitharbitrarymatrix3vectorprod-
+                          ucts. We assume that the MGS-GMRES variant of GMRES is used in GMRES-IR5,
+                          so we need to bound the backward error of two-precision MGS-GMRES for the solu-
+                                                                              e
+                          tion of the preconditioned system Adi = si. The analysis of Paige et al. [27] is for 昀椀xed
+                          precision, unpreconditioned MGS-GMRES, and therefore is not directly applicable.
+                                                                                                                                           2
+                          Note that in the analysis of [4] the preconditioner is applied in precision u , and using
+                                                                                                                          e                      2
+                          the assumption »(A)u < 1 it is shown that the products with A in precision u are at
+                          least as accurate as the products with A in precision u, so that the backward stability
+                          result of [27] still holds. In our case, the same argument does not apply, and so we
+                          must generalize the backward stability result [27, Eq. (8.15)] to the case of arbitrary
+                          matrix3vector products satisfying a generic error bound. We state the conclusion of
+                          our analysis in the next theorem.
+                                Theorem 3.1. Consider the solution of a linear system
+                                                                Bx=d, B∈Rn×n, 0̸=d∈Rn                                                                 (3.1)
+                          with an MGS-GMRES solver carrying out its operations in precision u , except for
+                                                                                                                                         g
+                          the products with B, which satisfy instead
+                                                             fl(Bv) = Bv +f,               ∥f∥ ≲ϵ ∥B∥ ∥v∥ ,                                           (3.2)
+                                                                                                 2       p       F      2
+                          where ϵp > 0 is a parameter quantifying the stability of the matrix3vector products.
+                          Provided that
+                                                                   Ã      (B) ≳ (k1/2ϵ +µeg )∥B∥ ,                                                    (3.3)
+                                                                     min                     p       kn         F
+                          there is a step k f n such that the algorithm produces a computed xb satisfying
+                                                                                                                                   k
+                                                                (B+∆B)xb =d+∆d,                                                                     (3.4a)
+                                                                                 k
+                                                                       ∥∆B∥ ≲(k1/2ϵ +µeg )∥B∥ ,                                                     (3.4b)
+                                                                                 F               p       kn         F
+                                                                         ∥∆d∥ ≲µeg ∥d∥ .                                                            (3.4c)
+                                                                                 2        kn      2
+                                Proof. The proof of Theorem 3.1 relies on the analysis of [27] and, more precisely,
+                          on [27, sec. 8] and [27, Eq. (4.3)] therein. For the sake of readability, we will not
+                          attempt to make this proof self-contained but, rather, we will highlight the di昀昀erences
+                          with the analysis in [27] and refer the reader to the appendix of [29] for the full details.
+                          The original notation has been slightly adapted to be consistent with the notation of
+                          this article inherited from [4] and [5].
+                                In our version of MGS-GMRES we consider a product with B satisfying (3.2).
+                          We now show that considering (3.2) with ϵ ̸= µg mainly changes [27, Eq. (4.3)].
+                                                                                               p         n
+                                                   b                               n×k
+                          Let us consider V = [vb ,...,vb ] ∈ R                          , the matrix of computed basis vectors, and
+                                                     k        1          k
+                           ˙
+                          V =[v˙ ,...,v˙ ] the same matrix but with its columns correctly normalized; that is,
+                            k        1          k
+                          for j f k,
+                                                       vb  =v˙ +∆v(1),              ∥∆v(1)∥ f µeg,                                                    (3.5)
+                                                        j       j          j              j     2       n
+                                                       b        ˙            (1)            (1)           (1)             (1)
+                                                       Vk = Vk +∆V               ,    ∆V         =[∆v1 ,...,∆v ],
+                                                                            k              k                              k
+                          where ∆v(1) is the error for the normalization of vb and ∆V(1) is the accumulated
+                                         j                                                                j              k
+                          error for the normalization of the basis at step k. By (3.2) and (3.5), we obtain
+                                                                     fl(Bvb ) = B(v˙ +∆v(1))+f
+                                                                             j             j         j           j
+                                                                                 =Bv˙ +∆v(2),
+                                                                                         j          j
+                                                                                           7
+                    where ∆v(2) = B∆v(1) +f satis昀椀es ∥∆v(2)∥ ≲ (ϵ +µeg)∥B∥                    since ∥v˙ ∥ = 1 and
+                               j           j       j                j   2      p     n      F           j 2
+                    ∥f ∥ ≲ϵ ∥B∥ ∥v˙ +∆v(1)∥ . We therefore obtain
+                      j 2      p     F   j       j   2
+                                       b         ˙         (2)          (2)        1/2         g
+                                  fl(BV ) = BV +∆V            ,   ∥∆V      ∥ ≲k (ϵ +µe )∥B∥ ,                    (3.6)
+                                        k         k       k             k   F            p    n       F
+                    where ∆V(2) contains the error for both the product and the normalization at the kth
+                               k
+                    iteration. Equation (3.6) is our new version of [27, Eq. (4.3)]; adapting the remainder
+                    of [27, sec. 8] to take this change into account is straightforward. Consequently, we
+                    show that at the (m¯ −1)st iteration, MGS-GMRES has computed a backward stable
+                    solution of the system, where m¯ satis昀椀es [27, Eq. (6.1)]. From now on, we set k such
+                    that k ≡ m¯ −1 f n, and rewrite [27, Eq. (8.2)] as
+                                                                                       ˙         (3)
+                           r (yb ) ≡ d −B yb ,       d ≡d+∆d (yb ),           B ≡BV +∆V (yb ),
+                            k   k      k      k k      k            k  k        k       k       k     k
+                           ∥∆d (yb )∥ f µeg ∥d∥ ,        ∆V(3)(y) ≡ ∆V(2) +∆C (y),                               (3.7)
+                                k  k   2     kn     2        k             k          k
+                           ∥∆V(3)∥ ≲(k1/2ϵ +µeg )∥B∥ ,
+                                k    F           p     kn      F
+                    where∆C (y)and∆d (y)aretheerrorsintheMGSleastsquaressolution[27, sec.7],
+                               k             k
+                    and where yb is the computed least squares solution at the kth iteration
+                                  k
+                                                                        ˙
+                                               yb  =argmin ∥d−BV y∥ , k <m.¯
+                                                 k            y          k   2
+                    Using the scaling invariance of MGS to scale the right-hand side d by some scalar ϕ′
+                                                                                                k
+                    and making use of [27, Thm. 2.4] gives a bound on the residual [27, Eq. (8.9)]
+                                                    2      g   2       ′ 2         2      ′ −2
+                                          ∥r (yˆ )∥ f (µe     ) (∥d ϕ ∥ +∥B ∥ )2(ϕ )           .                 (3.8)
+                                             k  k   2      kn       k    2       k F
+                                                        2             ′ 2
+                    In addition to bounding ∥B ∥           and ∥d ϕ ∥ , we use the nonsingularity condition
+                                                     k F           k    2
+                    (3.3) (which is an upper-bound of the condition number ∥B∥ ∥B−1∥ [9]) in the
+                                                                                              F        2
+                    same fashion as [27, Eq. (8.11)] to compute a bound for (ϕ′)−2, which allows us to
+                    rewrite [27, Eq. (8.12)] as
+                                               ∥r (yˆ )∥ ≲ µeg (∥B∥ ∥yˆ ∥ +∥d∥ ).                                (3.9)
+                                                  k   k  2     kn       F   k 2        2
+                    Since ϵp appears in second order terms and higher, they have been dropped, making
+                                                                                          b           b        (4)
+                    (3.9) equivalent to [27, Eq. (8.12)]. Considering now xb = fl(V yb ) = (V +∆V                 )yb
+                                                                                  k         k k        k       k     k
+                    and using a standard matrix3vector product in precision u satisfying ∥∆V(4)∥                    f
+                                                                                         g                  k    F
+                                                  (3)               (4)                    T
+                     g                                                                    xb
+                        b                                                  b     ˙         k
+                    µe ∥V ∥    and ∆B ≡[∆V (yb )−B(∆V                   +V −V )]yb           2 , we can rewrite [27,
+                     k   k F            k         k    k            k       k     k    k∥xb ∥
+                                                                                           k 2
+                    Eq. (8.15)] as
+                                                  r (yb ) = d + ∆d (yb ) − (B + ∆B )xb ,                       (3.10)
+                                                   k  k              k  k               k   k
+                                              ∥r (yb )∥ ≲ µeg (∥B∥ ∥xb ∥ +∥d∥ ),
+                                                k   k   2     kn      F    k 2        2
+                                           ∥∆d (yb )∥ f µeg ∥d∥ ,
+                                                k   k   2     kn    2
+                                               ∥∆B ∥ ≲(k1/2ϵ +µeg )∥B∥ .
+                                                    k F            p     kn       F
+                    This leads to (3.4) and completes the proof of the theorem.
+                    In the original analysis, fl(Bv) is a standard matrix3vector product operation and
+                    u =u ,sofl(Bv)=(B+∆B)v holdswhere∥∆B∥ fµg∥B∥ [14,sec.3.5]. In this
+                     p     g                                                   F      q     F
+                    case we can set f = ∆Bv and apply Theorem 3.1 with ϵ = µg, recovering the result
+                                                                                     p     q
+                    of [27] for an unpreconditioned MGS-GMRES in uniform precision, which produces a
+                    solution xb  of the system Bx = d satisfying
+                               k
+                              (B+∆B)xb =d+∆d, ∥∆B∥ ≲µeg ∥B∥ , ∥∆d∥ ≲µeg ∥d∥ .
+                                           k                       F      kn     F           2     kn     2
+                                                                    8
+                      3.2. Error analysis of GMRES-IR5 with general u and u precisions.
+                                                                                   g        p
+                                                                                           b−1     b−1
+                  We proceed in three steps. First, we bound the error in sb = fl(U             fl(L   rb )).
+                                                                                   i                    i
+                  Second, we use our analysis of MGS-GMRES of the previous section to prove the
+                                                                       e
+                  backward stability of the solution to the system Ad = sb . Third, we combine the
+                                                                          i     i
+                  previous two results to derive bounds of the type (2.1a)3(2.1b) for the solution of
+                  e
+                  Ad =s.
+                     i    i
+                      Webegin by bounding the error introduced in forming the preconditioned right-
+                                  b−1b−1
+                  hand side s = U     L rb in precision u . The computed sb satis昀椀es [14, Thm. 8.5]
+                              i             i               p                   i
+                                b         b                             p b              p b
+                               (L+∆L)(U +∆U)sb =rb, |∆L|fµ |L|, |∆U|fµ |U|.                          (3.11)
+                                                     i    i             n                n
+                  Also, considering [14, Thm. 9.3] the LU factors computed at precision u satisfy
+                                                                                              f
+                                          bb             (1)       (1)     f b b
+                                          LU =A+∆A , |∆A |fµn|L||U|.                                 (3.12)
+                                          b      b
+                  Note that, technically, L and U are not the computed factors of A, but the ones of A
+                  cast in precision u . As the condition number of the cast matrix can be substantially
+                                     f
+                  lower due to a regularization e昀昀ect (see [2]), »  (A) is sometimes an overestimate in
+                  the following analysis. We have                  ∞
+                                          b−1b−1       b    b
+                               s −sb = U      L (∆LU+L∆U+∆L∆U)sb
+                                i    i                                       i
+                                                   (1) −1     b   b
+                                       =(A+∆A ) (∆LU+L∆U+∆L∆U)sb
+                                                                                    i
+                                            −1     −1     (1) −1      b    b
+                                       ≈(A −A ∆A A )(∆LU+L∆U+∆L∆U)sb
+                                                                                             i
+                  and dropping second-order terms we obtain
+                                                p     −1 b b
+                                ∥s −sb∥     ≲µ ∥|A ||L||U|∥ ∥sb∥
+                                   i   i ∞      2n               ∞ i ∞
+                                            fn2Ä µep» (A)∥sb∥       ≲n2Ä µep» (A)∥s ∥ .              (3.13)
+                                                  n n ∞         i ∞        n n ∞        i ∞
+                  where the second inequality comes from [14, Lem. 9.6]. Actually, in the previous
+                  bound, certain terms of order »(A)2u u are dropped (as second order terms). While
+                                                         p f
+                  our assumptions allow »(A)u to be arbitrarily large and these terms to not be nec-
+                                                 f
+                  essarily negligible, we observe in practice that »(A)u     is generally at most of order
+                                                                           f
+                  a constant in these terms. This appears to be the result of the regularization e昀昀ect
+                  mentioned earlier.
+                      Next, we show that this new version of GMRES (with general u and u pre-
+                                                                                            p        g
+                                                                                    e                  e
+                  cisions) provides a backward stable solution to the system Ad = s , where A =
+                                                                                      i     i
+                  b−1b−1                b−1b−1
+                  U L Aands =U L r. We rely on Theorem 3.1, which provides backward
+                                   i              i
+                  error bounds for MGS-GMRES with general matrix3vector products. Our aim is
+                  therefore to prove that (3.2) holds for some ϵp when the matrix3vector products are
+                                           e   b−1b−1                                     e
+                  computed with matrix A = U       L Aandinprecisionu . Let z = Avb be computed
+                                                                             p       j      j
+                  in precision u by a matrix product followed by two triangular solves. Then
+                                p
+                                                   (2)                 (2)    p
+                                          (A+∆A )vb =wb , |∆A |fµ |A|,
+                                                        j     j               q
+                                              b                             p b
+                                             (L+∆L)yb =wb , |∆L|fµ |L|,
+                                                        j     j            n
+                                              b                             p b
+                                             (U +∆U)zb =yb , |∆U| f µ |U|.
+                                                         j    j             n
+                                                              9
+              The computed vector zb can therefore be written as
+                                  j
+                              b      −1 b      −1        (2)
+                        zb = (U +∆U) (L+∆L) (A+∆A )vb
+                         j                                  j
+                              b−1  b−1    b−1 b−1    b−1   b−1        (2)
+                          ≈(U −U ∆UU )(L −L ∆LL )(A+∆A )vb
+                                                                          j
+                             e
+                          =Avb +f ,
+                               j   j
+              where
+                            b−1b−1    (2) b−1b−1    b−1    b−1    b−1b−1 
+                       f ≈ U L ∆A −U L ∆LL A−U ∆UU L A vb
+                        j                                                   j
+                               −1   (2)   −1 −1          −1    
+                            e           b   b     b e  b      e
+                         = AA ∆A −U L ∆LUA−U ∆UA vb,
+                                                                 j
+              and so
+                                   p           b     b      b   e
+                           ∥f ∥ ≲µ (» (A)+» (U)» (L)+» (U))∥A∥ ∥vb ∥ .
+                            j 2    n F       F    F       F       F  j 2
+                                  b                           b
+              Since we can expect » (L) to be of modest size (because L is a unit triangular matrix
+                                F
+              with o昀昀-diagonal elements bounded by 1 if, for example, partial pivoting is used in
+                                          b            b
+              the factorization), and since » (U) ≲ » (A)» (L), we obtain
+                                       F       F     F
+                                   p       e            p       e
+                           ∥f ∥ ≲µe » (A)∥A∥ ∥vb ∥ f nµe » (A)∥A∥ ∥vb ∥ .       (3.14)
+                             j 2   n F       F  j 2    n ∞       F   j 2
+              Condition (3.2) is thus satis昀椀ed for ϵp = nµep»∞(A), and Theorem 3.1 is therefore
+                                                    n
+              applicable. From (3.4) we obtain
+                                 e    e b
+                                (A+∆A)d =sb +∆sb,                              (3.15a)
+                                         i   i    i
+                                      e       g     p           e
+                                   ∥∆A∥ ≲(µe +nµe       » (A))∥A∥ ,            (3.15b)
+                                        F     kn    k1/2n ∞       F
+                                    ∥∆sb∥ ≲µeg ∥sb∥ ≲ n1/2µeg ∥s ∥ .           (3.15c)
+                                       i 2   kn  i 2      kn  i ∞
+              Rewriting (3.15a) as
+                                       eb      eb
+                                   s −Ad =∆Ad −(sb −s )−∆sb                     (3.16)
+                                    i    i       i   i   i     i
+              and using (3.15b), (3.13), and (3.15c) to bound the three terms on the right-hand
+              side, we obtain
+                         eb        e    b
+                    ∥s −Ad ∥ f∥∆A∥ ∥d ∥ +∥sb −s ∥ +∥∆sb∥
+                     i     i ∞       ∞ i ∞      i   i ∞      i ∞
+                                    g     p         e    b
+                              ≲n µe   +nµe    » (A) ∥A∥ ∥d ∥
+                                    kn    k1/2n ∞       ∞ i ∞
+                                  +n2Ä µep» (A)∥s ∥  +n1/2µeg ∥s ∥
+                                       n n ∞      i ∞       kn i ∞
+                                  3     1/2                  e    b          
+                              ≲n max(k     , Ä ) u +u » (A) ∥A∥ ∥d ∥ +∥s ∥     .
+                                            n   g   p ∞         ∞ i ∞      i ∞
+                                                                     eb
+              In conclusion, the normwise relative backward error of the system Adi = si is bounded
+              by
+                                     eb                               
+                                ∥s −Ad ∥
+                                  i    i ∞     ≲f(n,k,Ä ) u +u » (A)            (3.17)
+                              e    b                   n   g   p ∞
+                            ∥A∥ ∥d ∥ +∥s ∥
+                                ∞ i ∞      i ∞
+                                               b
+              and the relative error of the computed di therefore satis昀椀es
+                                   b                           
+                              ∥d −d ∥
+                                i  i ∞                             e
+                                       ≲f(n,k,Ä ) u +u » (A) » (A),             (3.18)
+                                ∥d ∥            n   g   p ∞      ∞
+                                 i ∞
+              where f(n,k,Ä ) = n3max(k1/2,Ä ).
+                           n               n
+                                                 10
+                 3.3. Convergence conditions on »(A). We can now use this analysis together
+              with (2.2) and (2.3) to determine su昀케cient conditions for the convergence of the
+              forward and backward errors for general u and u parameters.
+                                                p     g
+                 Beginning with the forward error, (3.18) shows that (2.1a) holds with
+                                                                e
+                              u ∥E ∥ ≡f(n,k,Ä ) u +u » (A) » (A),
+                               s  i ∞         n   g   p ∞     ∞
+              and so, dropping constants, (2.2) becomes
+                                                    e
+                                      (u +u »(A))»(A) j1.                     (3.19)
+                                        g   p
+                                        e
+              By using the bound (2.5) on »(A), we obtain the condition
+                                                      2 2
+                                   (u +u »(A))(1+»(A) u )j1                   (3.20)
+                                    g    p              f
+              for the forward error to converge to its limiting value of order qu cond(A,x) + u.
+                                                                   r
+                 Next we determine a condition for the backward error to converge. First we
+              need to bound the backward error of the original correction equation Ad = r . By
+                                                                          i   i
+                                                             b    bb      eb
+              observing that the computed residual rb satis昀椀es rb − Ad = LU(s − Ad ), since
+                                               i        i     i       i     i
+                  b−1b−1
+              s =U L rb,andusing the bound (3.17) and the relation (3.12) we obtain
+               i         i
+                       b                           bb     e    b
+                 ∥rb −Ad ∥ ≲f(n,k,Ä ) u +u » (A) ∥LU∥ (∥A∥ ∥d ∥ +∥s ∥ )
+                  i     i ∞         n   g   p ∞       ∞     ∞ i ∞      i ∞
+                                                     e        b
+                           ≲f(n,k,Ä ) u +u » (A) (∥A∥ ∥A∥ ∥d ∥ +» (A)∥rb∥ ).
+                                    n  g    p ∞        ∞    ∞ i ∞    ∞      i ∞
+                                                                               e
+              Wehavethusshownthat(2.1b)holdswithu =u +u » (A),c =f(n,k,Ä )∥A∥ ,
+                                                  s   g   p ∞     1         n    ∞
+              and c = f(n,k,Ä )» (A). Dropping constants, condition (2.3) then becomes
+                  2         n  ∞
+                                               e
+                                   u +u »(A) (∥A∥+1)»(A)j1.
+                                    g   p
+              Using (3.12) we have
+                            e  b−1b−1            (1) −1       −1   (1)
+                           A=U L A=(A+∆A ) A≈I−A ∆A
+              and using [14, Lem. 9.6] we obtain the bound
+                           e          −1       (1)
+                         ∥A∥ ≲1+∥A ∥ ∥∆A ∥ f1+f(n,Ä )u » (A).
+                             ∞           ∞       ∞           n  f ∞
+              We昀椀nally obtain the condition
+                                  u +u »(A) 1+»(A)u »(A)j1                  (3.21)
+                                   g   p              f
+              for the backward error to converge to its limiting value of order qu + u.
+                                                                    r
+                 Wesummarize the error analysis of this section in the following theorem.
+                 Theorem 3.2. Let Ax = b be solved by GMRES-IR5 (Algorithm 3.1) using MGS-
+              GMRESat step 5. Provided that u g u, if
+                                          g
+                                                        2 2
+                                ϕ ≡(u +u »(A))(1+»(A) u )j1,                  (3.22)
+                                 1    g    p              f
+              the forward error will be reduced at each iteration by a factor approximately ϕ1 until
+              it reaches its limiting value qu cond(A,x) + u, and if
+                                      r
+                              ϕ ≡ u +u »(A) 1+»(A)u »(A)j1,                 (3.23)
+                               2     g   p              f
+              the backward error will be reduced at each iteration by a factor approximately ϕ until
+                                                                              2
+              it reaches its limiting value qu + u.
+                                      r
+                                               11
+                                                      Table 3.1
+                     Convergence conditions and limiting backward and forward errors for the LU-IR3, GMRES-
+                 IR5, and GMRES-IR3 algorithms. The convergence conditions of the 昀椀rst and third algorithms are
+                 retrieved from the analyses of [4], [5] that we summarized in section 2.
+                                            Backward error                    Forward error
+                   LU-IR3                    u »(A) j1                        u »(A) j1
+                                              f                                f
+                                                                                       2 2
+                   GMRES-IR5       u +u »(A) 1+»(A)u »(A)j1          (u +u »(A))(1+»(A) u )j1
+                                     g   p              f              g    p              f
+                                            1/2 1/2                          1/2
+                   GMRES-IR3               u  u   »(A) j1                   u   u »(A) j1
+                                               f                                 f
+                   Limiting values             qu +u                        qu cond(A,x)+u
+                                                 r                            r
+                     Curiously, condition (3.23) is stricter than the condition for the forward error,
+                 since (3.22) has an extra u  term. However, note that since the backward error is
+                                            f
+                 bounded by the forward error (see, for example, [14, Prob. 7.2]), (3.22) is also an
+                 obvious condition for the backward error to converge to the limiting value of the
+                                                                                  2
+                 forward error, of order qcond(A,x)u +u. In particular, if u = u , condition (3.23)
+                                                     r                       r
+                 is not useful because (3.22) also guarantees a backward error of order u with a less
+                 restrictive condition on »(A), since by assumption »(A)u < 1.
+                     As a check, we compare our results with [16], which analyzes the case u = u =
+                                                                                           p     g
+                 u =u, that is, GMRES-IR in two precisions, and uses a di昀昀erent argument to that
+                  r
+                 here. Considering 1 j »(A)u , our condition (3.22) for convergence of the forward
+                                               f
+                             3  2
+                 error is »(A) uu j 1 and our condition (3.23) for convergence of the backward error
+                                f
+                 is »(A)3uu j1. These conditions agree with [16, Eqs (3.8), (3.6)].
+                           f
+                     We also compare with the analysis of [5] for GMRES-IR3, the conclusions from
+                                                                             2
+                 which we summarized in section 2. For u = u and u = u , our condition (3.22)
+                                                           g           p
+                                                                  2          2 2
+                 for convergence of the forward error is (u+»(A)u )(1+»(A) u ) j 1, and requires
+                                                                               f
+                                   2  2
+                 in particular »(A) uu   j1, since we are assuming »(A)u < 1. This agrees with
+                                      f
+                 (2.6). Our condition (3.23) for convergence of the backward error requires, similarly,
+                 »(A)2uu j1, which agrees with condition (2.7).
+                         f
+                     Finally, we summarize in Table 3.1 convergence conditions and limiting backward
+                 and forward errors for LU-IR3, GMRES-IR3, and GMRES-IR5. Since the limiting
+                 backwarderrorandforwarderrorareindependentofthecorrectionequationsolver(as
+                 long as the conditions (2.1) are satis昀椀ed), they are the same for the three algorithms.
+                                                                                  2
+                 As explained in the previous paragraph, with u = u and u = u , the convergence
+                                                                g           p
+                 conditions of GMRES-IR5 reduce to those of GMRES-IR3. In addition, as long as
+                 u »(A) j 1, the forward error convergence condition is always better than the one
+                  p
+                 of LU-IR3 (we need more assumptions on u and u to have the same conclusion for
+                                                            g      p
+                 the backward error). Hence, the convergence conditions of GMRES-IR5 achieve a
+                 tradeo昀昀 between those of LU-IR3 and those of GMRES-IR3. A thorough comparison
+                 of these convergence conditions is the major concern of the rest of this article.
+                     3.4. Identifying meaningful combinations of precisions. Table 3.2 shows
+                 the most widely used 昀氀oating-point arithmetics; most modern supercomputers pro-
+                 vide hardware support for at least three of them. Assuming all these arithmetics can
+                 be used, GMRES-IR5 has thousands of di昀昀erent combinations of its 昀椀ve precision pa-
+                 rameters. Among these, not all are relevant and, therefore, it is important to identify
+                 the subset of meaningful combinations. We say a combination is meaningful if none of
+                 the precisions it employs can be reduced without degrading the numerical properties
+                 (convergence condition or limiting accuracy). Every meaningful combination attains
+                 a tradeo昀昀 between performance, robustness (ability to converge for ill-conditioned
+                                                         12
+                                                            Table 3.2
+                       Parameters for 昀氀oating-point arithmetics: symbol used in this paper, number of bits in signi昀椀-
+                  cand, number of bits in exponent, unit roundo昀昀, and range.
+                             Arithmetic   Symbol    Signi昀椀cand  Exponent    Unit roundo昀昀   Range
+                                                                                      −3       ±38
+                             b昀氀oat16     b         8            8           3.91 ×10        10
+                                                                                      −4       ±5
+                             fp16         h         11           5           4.88 ×10        10
+                                                                                      −8       ±38
+                             fp32         s         24           8           5.96 ×10        10
+                                                                                      −16      ±308
+                             fp64         d         53           11          1.11 ×10        10
+                                                                                      −35      ±4932
+                             fp128        q         113          15          9.63 ×10        10
+                  matrices), and accuracy (ability to converge to small errors).
+                                                                                                     2
+                       As an example, the meaningful combinations for LU-IR3 must satisfy u f u f
+                                                                                                           r
+                  ufu . Indeed, the limiting backward and forward errors (recalled in Table 3.1) show
+                         f
+                                                                             2                             2
+                  that we should have u f u and that setting u < u is not useful since u = u is
+                                           r                          r                              r
+                  already enough to ensure a forward error of order u (since by assumption »(A)u < 1).
+                                                                                    2
+                       Meaningful combinations for GMRES-IR5 also satisfy u f u f u f u , so our
+                                                                                          r          f
+                  aim now is to discuss the choice of the two new precision parameters u g u and
+                                                                                                   g
+                          2
+                  u gu . To compute the bounds on »(A) given by the conditions (3.22) and (3.23),
+                    p
+                                                                2 2
+                  we solve the equalities (u + u x)(1 + u x ) = 1 and (u + u x)(1 + u x)x = 1,
+                                               g     p          f                  g     p         f
+                  respectively. We now state some observations that can be deduced from our analysis,
+                  in particular from condition (3.22).
+                         • u fu . This昀椀rst observation comes from the term u +u »(A) that appears
+                             p     g                                                 g    p
+                           in the convergence conditions. We would like the components of this term to
+                           be balanced, so that u ≈ u /»(A) f u . So u < u may be required, but
+                                                    p     g            g       p     g
+                           u >u isnotmeaningful. We also note that there is no advantage to taking
+                             p     g
+                           u <u /»(A).
+                             p     g
+                         • u < u . This second observation comes from the fact that if u = u ,
+                             p      f                                                                 p      f
+                                                                 e
+                           condition (3.19) requires »(A)u »(A) j 1, which is worse than the condition
+                                                             f
+                           »(A)u j1for LU-IR3.
+                                  f
+                         • u < u, u = u, and u > u are all meaningful. This is one of the main
+                             p         p              p
+                                                                                                2
+                           conclusions of our analysis. We know from [5] (in which u = u and u = u)
+                                                                                          p             g
+                                                2
+                           that setting u = u provides the least restrictive convergence conditions (2.6)
+                                          p
+                           and(2.7), but the precise role of u in the convergence was not analyzed. With
+                                                               p
+                           the new conditions (3.22) and (3.23) obtained from our generalized analysis,
+                           we can now understand what the conditions become if u is taken larger
+                                                                                            p
+                                   2
+                           than u . Crucially, setting u      = u and even u > u can potentially yield
+                                                            p                   p
+                           conditions that remain less restrictive than the LU-IR3 condition »(A)u j
+                                                                                                         f
+                           1, and therefore represent meaningful combinations. Let us illustrate this
+                           observation with a practical example. Assume u is set to fp16 and u = u ,
+                                                                                f                            g
+                           with u set to fp64. Then the condition for the forward error to converge
+                                   g
+                           with LU-IR3 is »(A) j 2×103. Instead, with GMRES-IR5:
+                              3 If u is set to fp128 (as in [5]), condition (3.22) becomes »(A) j 2×1011.
+                                     p
+                                 Werecover the same condition as in [5].
+                              3 If u is set to fp64 (and thus u = u), condition (3.22) becomes »(A) j
+                                     p                            p
+                                 3 × 107, which is still much better than the LU-IR3 condition. This
+                                 version of GMRES-IR was analyzed in [16] and has been successfully
+                                 used in practice, for example in [11], [12].
+                              3 If u is set to fp32 (and thus u > u), condition (3.22) becomes »(A) j
+                                     p                            p
+                                 4×104, which is still over an order of magnitude better than the LU-IR3
+                                                                13
+                             condition. Note that this variant uses up to four di昀昀erent precisions if
+                             u is set to fp128. Note also that this combination is actually not mean-
+                              r
+                             ingful with u set to fp64 (because u > u ), but it becomes meaningful
+                                         g                      p    g
+                             by switching u to fp32 (and thus u = u > u), see the next bullet.
+                                           g                    g    p
+                        These examples illustrate how the u precision can be tuned to achieve dif-
+                                                           p
+                        ferent levels of tradeo昀昀 between robustness (ability to handle ill-conditioned
+                        matrices) and performance (cost of the application of LU factors within GM-
+                        RES).
+                      • u =uandu >uarebothmeaningful. Thisisalsoanimportant conclusion
+                          g          g
+                        of our analysis. Whereas in [5], u is set to u to obtain the least restrictive
+                                                         g
+                        convergence condition, our analysis reveals that setting u > u can also be
+                                                                                g
+                        meaningful. In fact, as long as u < 1, condition (3.22) is better than the
+                                                         g
+                        LU-IR3 condition »(A)u j 1, so we have much 昀氀exibility in choosing u .
+                                                f                                               g
+                        Let us again illustrate this with a practical example. Assume u   is set to
+                                                                                        f
+                        fp16 and u = u are set to fp64. With u = u, as previously stated, the
+                                        p                         g
+                        condition (3.22) is »(A) j 3 × 107. However, if u is set to fp32, the
+                                                                             g
+                                                   6
+                        condition is »(A) j 8×10 , which is only slightly worse and remains much
+                        better than the LU-IR3 condition. The precision u can be chosen even
+                                                                            g
+                        lower, for example if u is set to fp16 (i.e., u = u ), the condition becomes
+                                              g                     g    f
+                        »(A) j 9×104 and still remains better than the LU-IR3 one. Note that
+                        with u set to fp32, setting u to fp128 instead of fp64 does not improve the
+                               g                    p
+                                                6
+                        condition »(A) j 8×10 : this shows that the meaningful values of u can be
+                                                                                          p
+                        in昀氀uenced by the choice of u , and vice versa. In conclusion the u precision
+                                                    g                                   g
+                        canalsobetunedtoachievedi昀昀erentlevelsoftradeo昀昀betweenrobustnessand
+                        performance (the cost of GMRES and, in particular, the memory footprint
+                        of the Krylov basis).
+                      • u <u , u = u , and u > u are all meaningful. This 昀椀nal observation is
+                          g    f   g    f       g     f
+                        that u and u can be independent. We have already illustrated in previous
+                              g       f
+                        examples where u is fp16 that u < u and u = u are both meaningful.
+                                          f              g    f       g     f
+                        This 昀椀nal observation states that even ug > uf can be meaningful. To see
+                        why, let us take another example with u    set to fp32 and u = u set to
+                                                                 f                        p
+                                                                                          8
+                        fp64. Then setting u to fp16 yields the condition »(A) j 7 × 10 , which
+                                             g
+                        is better than any combination with the same u and u but with u set to
+                                                                              p           f
+                                                                               7
+                        fp16 (the best possible condition being »(A) j 3 × 10 for u at least in
+                                                                                      g
+                        fp64). Usually, one would expect an fp16 LU factorization and fp32 GMRES
+                        to be faster than the converse (fp32 factorization and fp16 GMRES), so in
+                        practice the combinations with u > u are only relevant for a narrow range
+                                                        g    f
+                                                                                  7
+                        of »(A) (in this example, for »(A) such that »(A) j 3×10 is not satis昀椀ed
+                                           8
+                        but »(A) j 7×10 is).
+                    In Table 3.3, we summarize all the possible combinations of u and u when u
+                                                                                p       g        f
+                is set to b昀氀oat16, fp16, or fp32 (these three precisions being the ones that determine
+                the convergence conditions). The underlined, red terms correspond to combinations
+                of these three precisions that are not meaningful. Interestingly, when the working
+                precision u is fp64 and the residual precision u is fp128, Table 3.3 contains thirteen
+                                                             r
+                meaningful variants that use at least four di昀昀erent arithmetics, including two that use
+                all 昀椀ve (bhs and hbs).
+                    All the observations made in this part reduce the number of meaningful combina-
+                tions of the 昀椀ve precision parameters to a subset of 112 combinations, corresponding
+                to 3.5% of all the possibilities. We summarize the numerical properties (convergence
+                condition and limiting accuracy, for both the forward and backward errors) of a se-
+                                                        14
+                                                                Table 3.3
+                         Bound on »(A), rounded to one signi昀椀cant 昀椀gure, given by conditions (3.22) and (3.23) for
+                    the forward and backward errors to converge with GMRES-IR5, depending on the precisions u ,
+                                                                                                                     f
+                    u , and u , and assuming the working precision u is double. We recall that the forward error
+                     g        p
+                                                                        2                            3
+                    convergence condition for LU-IR3 is »(A) j 3×10 for u = b, »(A) j 2×10 for u = h, and
+                                                                               f                            f
+                                   7
+                    »(A) j2×10 for u = s. The red, underlined terms denote combinations of precisions that are
+                                          f
+                    not meaningful. Each variant is presented in the form of a triplet (u ,ug,up), hence hdq means
+                                                                                          f
+                    u =h, u = d, and u = q. We recall that u does not play a role in the convergence bounds.
+                     f        g            p                      r
+                                                   Variants (u , u , u )   Forward     Backward
+                                                              f   g   p
+                                                                                 2           1
+                                                   bbh bhh bsh bdh         5×10        4×10      §
+                                                                                 3           2
+                                                   bbs bbd bbq             4×10        2×10
+                                                                                 3           2
+                                                   bhs                     8×10        6×10
+                                                                                 4           2
+                                         uf = b    bhd bhq                 1×10        6×10
+                                                                                 4           3
+                                                   bss bds                 1×10        2×10
+                                                                                 6           4
+                                                   bsd bsq                 1×10        7×10
+                                                                                 6           6
+                                                   bdd                     8×10        1×10
+                                                                                 10          9
+                                                   bdq                     2×10        2×10
+                                                                                 4           2
+                                                   hbs hbd hbq             3×10        2×10
+                                                                                 4           3
+                                                   hhs                     4×10        1×10
+                                                                                 4           3
+                                                   hss hds                 4×10        3×10
+                                         u =h                                    4           3
+                                          f        hhd hhq                 9×10        1×10
+                                                                                 6           5
+                                                   hsd hsq                 8×10        2×10
+                                                                                 7           6
+                                                   hdd                     3×10        3×10
+                                                                                 11          9
+                                                   hdq                     2×10        4×10
+                                                                                 8           2
+                                                   sbd sbq                 3×10        3×10
+                                                                                 8           3
+                                                   shd shq                 7×10        2×10
+                                                                                 10          7
+                                         uf = s    ssd                     1×10        1×10
+                                                                                 10          7
+                                                   sdd                     1×10        5×10
+                                                                                 10          7
+                                                   ssq                     7×10        1×10
+                                                                                 15          11
+                                                   sdq                     2×10        4×10
+                               § bhh is slightly better than bbh on Forward and Backward before rounding.
+                    lected subset of 42 GMRES-IR5 variants in Table 3.4. Importantly, the table includes
+                    variants used in existing implementations, for which our analysis provides new the-
+                    oretical guarantees. It also includes new combinations of precisions not proposed
+                    previously that achieve new, 昀椀ner tradeo昀昀s between the convergence conditions and
+                    the precisions used.
+                         In order to select the appropriate combination of precisions, we have shown in
+                    this section that the user can choose within the subset of the meaningful combinations
+                    those providing the appropriate convergence condition and forward and backward
+                    error bounds according to the application requirements. Within this selection the user
+                    can take into account hardware and software features to further re昀椀ne the selection.
+                         4. Numerical experiments. We now perform numerical experiments to assess
+                    the validity of the convergence conditions of GMRES-IR5 derived in the previous
+                    section.   Throughout our experiments, we focus on the forward error convergence
+                    (condition (3.22)) and we 昀椀x u = d and u = q and analyze the role of the factorization
+                                                                   r
+                    precision u and that of the newly introduced precisions u (preconditioned matrix3
+                                f                                                       p
+                    vector product precision) and u (GMRES precision).
+                                                         g
+                         We have written a Julia code that implements GMRES-IR5 and LU-IR3, where
+                    half precision arithmetics (fp16 and blfoat16) are simulated. We have made this code
+                                        1
+                    publicly available .
+                        1https://github.com/bvieuble/Itref.jl
+                                                                    15
+                                                     Table 3.4
+                    Bounds on »(A), rounded to one signi昀椀cant 昀椀gure, such that GMRES-IR5 with the precisions
+                in the 昀椀rst 昀椀ve columns is guaranteed to converge to the indicated limiting error values.
+                                                      Forward error       Backward error
+                           u   u   u    u    u   »(A)      Limit         »(A)      Limit
+                                r   f    g    p
+                                                      3                       2
+                           s   s   b    b    s   4×10      cond(A,x)×s   2×10      s
+                                                      3                       2
+                           s   s   b    h    s   8×10      cond(A,x)×s   6×10      s
+                                                      4                       3
+                           s   s   b    s    s   1×10      cond(A,x)×s   2×10      s
+                                                      4                       3
+                           s   s   h    h    s   4×10      cond(A,x)×s   1×10      s
+                                                      4                       3
+                           s   s   h    s    s   4×10      cond(A,x)×s   3×10      s
+                                                      6                       4
+                           s   s   b    s    d   1×10      cond(A,x)×s   7×10      s
+                                                      6                       5
+                           s   s   h    s    d   8×10      cond(A,x)×s   2×10      s
+                                                      3                       2
+                           s   d   b    b    s   4×10      s             2×10      s
+                                                      3                       2
+                           s   d   b    h    s   8×10      s             6×10      s
+                                                      4                       3
+                           s   d   b    s    s   1×10      s             2×10      s
+                                                      4                       3
+                           s   d   h    h    s   4×10      s             1×10      s
+                                                      4                       3
+                           s   d   h    s    s   4×10      s             3×10      s
+                                                      6                       4
+                           s   d   b    s    d   1×10      s             7×10      s
+                                                      6                       5
+                           s   d   h    s    d   8×10      s             2×10      s
+                                                      3                       2
+                           d   d   b    b    s   4×10      cond(A,x)×d   2×10      d
+                                                      3                       2
+                           d   d   b    h    s   8×10      cond(A,x)×d   6×10      d
+                                                      4                       3
+                           d   d   b    s    s   1×10      cond(A,x)×d   2×10      d
+                                                      4                       3
+                           d   d   h    h    s   4×10      cond(A,x)×d   1×10      d
+                                                      4                       3
+                           d   d   h    s    s   4×10      cond(A,x)×d   3×10      d
+                                                      6                       4
+                           d   d   b    s    d   1×10      cond(A,x)×d   7×10      d
+                                                      6                       5
+                           d   d   h    s    d   8×10      cond(A,x)×d   2×10      d
+                                                      6                       6
+                           d   d   b    d    d   8×10      cond(A,x)×d   1×10      d
+                                                      7                       6
+                           d   d   h    d    d   3×10      cond(A,x)×d   3×10      d
+                                                      8                       3
+                           d   d   s    h    d   7×10      cond(A,x)×d   2×10      d
+                                                      10                      7
+                           d   d   s    d    d   1×10      cond(A,x)×d   5×10      d
+                                                      10                      9
+                           d   d   b    d    q   2×10      cond(A,x)×d   2×10      d
+                                                      11                      9
+                           d   d   h    d    q   2×10      cond(A,x)×d   4×10      d
+                                                      15                      11
+                           d   d   s    d    q   2×10      cond(A,x)×d   4×10      d
+                                                      3                       2
+                           d   q   b    b    s   4×10      d             2×10      d
+                                                      3                       2
+                           d   q   b    h    s   8×10      d             6×10      d
+                                                      4                       3
+                           d   q   b    s    s   1×10      d             2×10      d
+                                                      4                       3
+                           d   q   h    h    s   4×10      d             1×10      d
+                                                      4                       3
+                           d   q   h    s    s   4×10      d             3×10      d
+                                                      6                       4
+                           d   q   b    s    d   1×10      d             7×10      d
+                                                      6                       6
+                           d   q   b    d    d   8×10      d             1×10      d
+                                                      6                       5
+                           d   q   h    s    d   8×10      d             2×10      d
+                                                      7                       6
+                           d   q   h    d    d   3×10      d             3×10      d
+                                                      8                       3
+                           d   q   s    h    d   7×10      d             2×10      d
+                                                      10                      7
+                           d   q   s    d    d   1×10      d             5×10      d
+                                                      10                      9
+                           d   q   b    d    q   2×10      d             2×10      d
+                                                      11                      9
+                           d   q   h    d    q   2×10      d             4×10      d
+                                                      15                      11
+                           d   q   s    d    q   2×10      d             4×10      d
+                    4.1. Random dense matrices. We 昀椀rst use random dense matrices with spec-
+                i昀椀ed condition 2-norm number »(A), which are generated in Julia with the command
+                matrixdepot(’randsvd’, n, kappa, mode) where mode = 2. Note that this class
+                of matrices leads to unusually large growth factors Än of order n [13]. However, we
+                use only small matrices (n = 50), for which Än does not exceed 20.
+                                        c
+                    We take »(A) = 10 , for c = 0: 17 and, for each value of »(A), we generate
+                100 random 50×50 matrices of corresponding condition number. Then, we run LU-
+                                                        16
+                 IR3 and GMRES-IR5 on each matrix and compute their success rate, that is, the
+                 percentage of matrices for which a forward error ∥x − xˆ∥ /∥x∥ f 4.44 × 10−16 is
+                                                                            2    2
+                 achieved, since with u = d and u = q the forward error should reach full double
+                                                   r
+                 precision with no dependency on cond(A,x).
+                     Figure 4.1 reports the success rate of LU-IR3 and nine variants of GMRES-IR5,
+                 corresponding to all possible combinations of the u and u parameters over the values
+                                                                   p      g
+                 u =s,d,qandu =b,s,d,withu =b昀椀xedforallvariants. This experiment allows
+                  p               g                f
+                 us to obtain an empirical bound on the value of »(A) at which each variant stops
+                 being able to converge. For example, the success rate of LU-IR3 is 100% as long as
+                            2
+                 »(A) f 10 , but starts decreasing for larger »(A), and quickly becomes 0%. This
+                 experimentally con昀椀rms the theoretical condition »(A) j 2 × 103 given by (2.4).
+                 Some combinations in Figure 4.1 are not meaningful as de昀椀ned by section 3.4; we use
+                 red underlining in the legend to distinguish them.
+                     Let us now analyze the GMRES-IR5 variants, starting with the role of the pre-
+                 conditioned matrix3vector product precision u     with 昀椀xed u   = D (top graph of
+                                                                 p             g
+                 Figure 4.1). We can observe that convergence is achieved with 100% success rate as
+                                                 7                   15
+                 long as »(A) is smaller than 10 for u = s and 10      for u = d or q. The relative
+                                                       p                    p
+                 robustness of each method is therefore consistent with the theoretical bounds of Ta-
+                 ble 3.3. However, the variants with u = s and u = d both perform much better
+                                                       p            p
+                 than expected. This is not entirely surprising since the analysis can be pessimistic,
+                                                     e
+                 especially in the bound (2.5) on »(A), which in practice has been observed to often
+                 be of order »(A)u rather than the worst-case bound (»(A)u )2 [4], [26], [28].
+                                   f                                          f
+                     Next we analyze the role of the GMRES precision u by comparing the top graph
+                                                                        g
+                 of Figure 4.1 with the middle and bottom ones. When u = s, switching from u = d
+                                                                         p                      g
+                 (top) to u = s (middle) has no impact on the success rate, which equals 100% as long
+                           g
+                 as »(A) f 107; reducing the precision even further by setting u = b (bottom) only
+                                                                                 g
+                                                                                     5
+                 has a slight impact: the success rate remains at 100% for »(A) f 10 . When u = d
+                                                                                                p
+                 or q, reducing the GMRES precision has a much more visible impact: a 100% success
+                                                        9                                 5
+                 rate is achieved only when »(A) f 10 (u = s, middle) or »(A) f 10 (u = b,
+                                                            g                                  g
+                 bottom).
+                     These experiments also show that the success rate is independent of u when
+                                                                                              p
+                 u = B, and almost independent of u when u = S. This illustrates that the
+                  g                                      g         p
+                 meaningful choices of u depend on the choice of u , and vice versa. Overall, the
+                                         p                            g
+                 experiments of Figure 4.1 are therefore in good agreement with the theoretical bounds.
+                 Importantly, they con昀椀rm that even with relaxed requirements on the precisions u
+                                                                                                    p
+                 and u , GMRES-IR5 can still handle matrices that are much more ill-conditioned
+                       g
+                 than LU-IR3.
+                     Finally, we evaluate in Figure 4.2 the two meaningful variants of Table 3.3 that
+                 use 昀椀ve di昀昀erent precisions: bhs (u   = b, u = h, u = s) and hbs (u = h,
+                                                      f         g         p                   f
+                 u = b, u = s). We compare these two variants with LU-IR3 with u = b or
+                  g         p                                                               f
+                 h, and with the bbs and hhs GMRES-IR5 variants (u = b, u = b, u = s and
+                                                                         f        g        p
+                 u =h,u =h,u =s),which are the four-precision variants right below and above
+                  f        g       p
+                 in terms of convergence condition. The 昀椀gure experimentally con昀椀rms that both of
+                 these 昀椀ve-precision variants are in between bbs and hhs and are able to handle more
+                 ill-conditioned matrices than LU-IR3, showing that they are meaningful not only
+                 theoretically but also in practice.
+                     4.2. Real-life matrices from SuiteSparse. It is also important to check
+                 whether reducing the preconditioner and/or GMRES precisions impacts the num-
+                 ber of iterations required to converge. To answer this question, we use a set of 230
+                                                          17
+                                                                     ug = d
+                           100%
+                            80%
+                         rate                                                              LU-IR3
+                                                                                           up = s
+                            60%
+                                                                                           up = d
+                            40%                                                            u =q∗
+                                                                                            p
+                         Success20%
+                                    0        2        4        6       8        10       12       14       16
+                                 10       10       10       10       10      10       10       10       10
+                                                                      κ(A)
+                                                                     ug = s
+                           100%
+                            80%
+                                                                                           LU-IR3
+                         rate60%                                                           up = s
+                                                                                           up = d
+                            40%                                                            u =q
+                                                                                             p
+                            20%
+                         Success    0        2        4        6       8        10       12       14       16
+                                 10       10       10       10       10      10       10       10       10
+                                                                      κ(A)
+                                                                     ug = b
+                           100%
+                            80%
+                                                                                           LU-IR3
+                         rate60%                                                           up = s
+                                                                                           up = d
+                            40%                                                            u =q
+                                                                                             p
+                            20%
+                         Success    0        2        4        6       8        10       12       14       16
+                                 10       10       10       10       10      10       10       10       10
+                                                                      κ(A)
+                        Fig. 4.1. Proportion of matrices for which LU-IR3 and GMRES-IR5 with varying u and u
+                                                                                                             p       g
+                    converged to double precision forward error as a function of »(A). For all variants, u = b, u = d,
+                                                                                                         f
+                    and u = q. The red, underlined terms denote combinations of precisions that are not meaningful
+                         r
+                    in Table 3.3. The GMRES-IR5 variant with an asterisk “*” is equivalent to GMRES-IR3.
+                    matrices from the SuiteSparse collection. These matrices are all real, square, and of
+                    dimension between 500 and 3000. We compare, over the values u = b,h,s, LU-IR3
+                                                                                                f
+                    with a subset of meaningful GMRES-IR5 variants that are selected to illustrate re-
+                    markable behaviors and provide insight on the properties of the method. Rather than
+                    counting the number of iterations, we count the number of calls to LU triangular
+                    solves: this is because in the case of GMRES-IR5, an extra LU solve is required at
+                    the start of each IR step (external iterations).
+                        For the experiments that use an LU factorization in fp16 arithmetic, we must pay
+                    attention to the narrow range of this arithmetic (see Table 3.2). Many matrices in our
+                    set have entries outside of this range, and so it is essential to address this issue. We
+                                                                    18
+                           100%
+                                                                                           LU: u = b
+                                                                                                 f
+                            80%                                                            LU: u = h
+                                                                                                 f
+                         rate
+                                                                                           bbs
+                            60%
+                                                                                           hbs
+                            40%
+                                                                                           bhs
+                                                                                           hhs
+                            20%
+                         Success
+                                    0        2        4        6       8        10       12       14       16
+                                 10       10       10       10       10      10       10       10       10
+                                                                      κ(A)
+                        Fig. 4.2.   Proportion of matrices for which LU-IR and GMRES-IR variants (including 昀椀ve
+                    meaningful precisions combinations, with u , u , u as speci昀椀ed in the legend) converged to double
+                                                               f   g   p
+                    precision forward error as a function of »(A). For all variants u = d and u       = q and all the
+                                                                                                   r
+                    variants in this 昀椀gure are meaningful.
+                    use the diagonal scaling method of [21], which 昀椀rst normalizes every row and column
+                    by its maximum value (preventing over昀氀ow), and then scales the matrix by a quantity
+                    ¼ close to the maximum representable value (to minimize under昀氀ow).
+                        Onedi昀케culty is that the number of iterations is very sensitive to the choice of the
+                    GMRESstopping criterion Ä and the scaling factor ¼, and that the optimal choice of
+                    Ä and ¼ is di昀昀erent for each variant and matrix. For the comparison to be as fair as
+                    possible, for each variant and each matrix, we have tested eight di昀昀erent values of Ä
+                       −10     −8      −6     −4     −3     −2     −1              −1
+                    (10    , 10   , 10   , 10   , 10   , 10    , 10   , and 5×10      ) and 昀椀ve di昀昀erent values of
+                          4    3     2    1          0
+                    ¼ (10 , 10 , 10 , 10 , and 10 ), and taken the values that leads to the lowest number
+                    of iterations. We note in passing that the parameter Ä could be taken into account
+                    in the error analysis. Indeed, Ä provides a bound on the backward error (3.15) of the
+                                                e
+                    solution of the system Ad = s by GMRES, which readily a昀昀ects the convergence
+                                                  i      i
+                    conditions.
+                        We present in Figure 4.3 performance pro昀椀les for uf = b,h,s, which plot the
+                    percentage ϕ of matrices for which a given variant converges in less than ³ times the
+                    number of LU solves required by the best variant. We also provide detailed results
+                    on a representative sample of these matrices for the case u = b in Table 4.1.
+                                                                                        f
+                        These results are in agreement with our theoretical study and with the previous
+                    experiments of section 4.1, and provide a con昀椀rmation of the relative robustness of
+                    each variant on a dataset of real-life applications matrices. For example, with u = b,
+                                                                                                               f
+                    LU-IR3 only converges for about 35% of the matrices, whereas with GMRES-IR3
+                    (bdq variant), we are able to process about 95% of the matrices (the 5% remaining
+                    being highly ill-conditioned matrices). Crucially, the new GMRES-IR5 variants (with
+                    relaxed u and/or u ) are all more robust than LU-IR3, converging for a much larger
+                              p            g
+                    percentage of matrices. In particular, on this set of matrices, the bdd variant is as
+                    robust as bdq and requires the same number of LU solves. Therefore, these experi-
+                    ments show that, in practice, we can switch from u = q to u = d with no impact
+                                                                                p           p
+                    on the convergence of GMRES-IR.
+                        The other two performance pro昀椀les with u              = h and s show similar trends.
+                                                                            f
+                    Unsurprisingly, as we increase the precision of the factorization, LU-IR3 is able to
+                    converge on a wider range of matrices and so the range of matrices where GMRES-IR
+                    is relevant is narrower. This is especially the case for an fp32 factorization, where
+                    LU-IR3 is able to converge on almost 90% of the matrices. Note that this observation
+                    heavily depends on the dataset: for these matrices, the distribution of the »(A) is not
+                                                                    19
+                                                                       uf = b
+                        100%
+                          80%
+                                                                                                   ∗
+                                                                                               bdq
+                          60%
+                        ϕ                                                                       bdd
+                                                                                                bsd
+                          40%
+                                                                                                bss
+                                                                                                bbd
+                                                                                                bbs
+                          20%                                                               LU: u = b
+                                                                                                  f
+                                                   2                              6       8     10
+                                                                       4
+                                                                       uf = h
+                        100%
+                          80%
+                                                                                                   ∗
+                                                                                               hdq
+                          60%
+                        ϕ                                                                       hdd
+                                                                                                hsd
+                          40%
+                                                                                                hss
+                                                                                                hhd
+                                                                                                hhs
+                          20%                                                               LU: u = h
+                                                                                                 f
+                                                   2                              6       8     10
+                                                                       4
+                                                                       uf = s
+                        100%
+                          80%
+                                                                                                   ∗
+                                                                                               sdq
+                          60%
+                        ϕ                                                                       sdd
+                                                                                                ssd
+                          40%
+                                                                                                sbd
+                                                                                            LU: uf = s
+                          20%
+                                                   2                              6       8     10
+                                                                       4
+                                                                          α
+                                                       § Equivalent to GMRES-IR3
+                        Fig. 4.3.    Performance pro昀椀le of LU-IR3 and GMRES-IR5 variants (with u , u , u as
+                                                                                                         f   g    p
+                    speci昀椀ed in the legend) on 230 SuiteSparse matrices. ϕ (y-axis) indicates the percentage of matrices
+                    for which a given variant requires less than ³ (x-axis) times the number of LU solves required by the
+                    best variant. GMRES-IR5 variants with an asterisk “*” are equivalent to GMRES-IR3 variants.
+                                                                    20
+                                                              Table 4.1
+                        NumberofLUsolvesonasampleofSuiteSparsematricesforLU-IR3andGMRES-IR5variants
+                   with u = b. »(A) is the original condition number, »(As) is the condition number after scaling.
+                         f
+                   Thematrices are sorted by increasing »(As). A “4” indicates failure to converge. The GMRES-IR5
+                   variant with an asterisk “*” is equivalent to GMRES-IR3.
+                             Name        n     »(A)       »(As)     LU-IR3    bbs   bbd    bss   bsd    bdd    bdq∗
+                           dw256B      512    3.7E+00    1.8E+00         8     24    24     10    10     10      10
+                            gre 512    512    1.6E+02    1.7E+02        16     28    28     17    17     14      14
+                          mahindas    1258    2.1E+13    9.8E+02        12     34    36     14    12     12      12
+                            dw1024    2048    2.1E+03    1.9E+03        18     36    36     20    20     19      19
+                           fs 541 4    541    1.2E+10    6.9E+03        4 48         48     33    35     28      28
+                            rajat12   1879    6.9E+05    8.1E+03        4 94         69     29    29     24      24
+                          sherman1    1000    1.6E+04    9.3E+03        4 78         78     30    26     26      26
+                             watt 2   1856    1.4E+11    3.0E+04        4 522       497     32    32     26      26
+                            bp 600     822    1.5E+06    6.6E+04        4 56         54     23    25     19      19
+                          bwm2000     2000    2.4E+05    2.0E+05        4 4 4 237 197 148                       148
+                              meg1    2904    1.4E+12    3.4E+05        13     28    26     17    17     14      14
+                           lnsp 511    511    3.3E+15    5.8E+05        4 302       268     39    30     23      23
+                      hangGlider 2    1647    1.4E+09    1.2E+06        4 52         56     32    33     31      31
+                           tub1000    1000    1.3E+06    1.3E+06        4 4 4 354 254 114                       114
+                          1138 bus    1138    8.6E+06    2.4E+06        4 4 4 238 163                    83      83
+                           gre 1107   1107    3.2E+07    2.3E+07        4 4 4 244 185                    75      75
+                            rajat19   1157    1.1E+10    1.4E+08        4 4 4 4 4 70 69
+                     spaceStation 7   1134    3.9E+11    1.7E+08        4 4 4 4 220 127                         127
+                           bcsstk19    817    1.3E+11    1.2E+09        4 4 4 4 4 307 209
+                     reorientation 3  2513    1.5E+21    8.9E+11        4 4 4 4 4 144 188
+                           fs 760 3    760    9.8E+19    2.6E+12        4 4 4 4 4 4 4
+                           nnc1374    1374    3.7E+14    5.2E+12        4 4 4 4 4 85 92
+                              lung1   1650    5.1E+19    1.1E+13        4 4 4 4 4 27 27
+                                                                        3        6
+                   uniform and is mainly concentrated between 10 and 10 , which explains why LU-IR3
+                   performs well with an fp32 factorization.
+                        A performance comparison of the actual runtime of the variants is outside our
+                   scope, but we can nevertheless extrapolate some performance trends based on Fig-
+                   ure 4.3 and on the assumptions that (1) the LU solves dominate the overall runtime
+                   of the iterative phase of the solver; and (2) a b昀氀oat16 LU solve is twice faster than an
+                   fp32 one, which is itself twice faster than an fp64 one. With this performance model
+                   and considering for example u = b, we can expect LU-IR3 (which uses b昀氀oat16 LU
+                                                     f
+                   solves) to be the fastest method as long as it does not require more than twice the
+                   number of LU solves of a variant with u = S, that is, for about 30% of the matri-
+                                                                  p
+                   ces. Similarly, the bss variant should outperform bdd for over 70% of the matrices,
+                   making it the best variant for about 70 − 30 = 40% of the matrices. Finally, on our
+                   set of matrices, the bdd variant never requires more LU solves than the bdq one and
+                   therefore it should be the best variant for the remaining 30% of the matrices. In the
+                   next section we give a more precise model of the cost of GMRES-IR5.
+                        5. Discussion on the complexity of GMRES-IR5. LU-IR3 and GMRES-
+                   IR5 improve the execution time over a direct solver by substantially reducing the
+                   number of high precision 昀氀ops to obtain a solution of comparable accuracy. The
+                   execution time of these algorithms can be modeled using the following expressions:
+                                                                  21
+                                                                                               
+                           cost(LU-IR3) = É c +#it           × É (c +c )+É c +É c ,
+                                              f F       outer     r  A     MV      f LU     u A
+                     cost(GMRES-IR5) = É c
+                                              f F                                                      
+                                            +#it       × É (c +c )+É (c +c               +c )+É c
+                                                   outer    r   A    MV      p  A     MV    LU      u A
+                                                                                     
+                                            +#it       × É (c      +c )+É c             ,
+                                                   inner    p  MV     LU      g GMRES
+                  where the Éf,p,r,g,u coe昀케cients quantify the time for one arithmetic operation cor-
+                  responding to the precision parameters u , u , u , u , u, #it            and #it       cor-
+                                                               f    p   r   g         outer         inner
+                  respond to the number of outer (IR steps) and cumulated inner (GMRES) itera-
+                  tions, and cA, cF, cLU, cMV, and cGMRES measure the 昀氀ops cost of the vector3vector
+                  addition/subtraction, the LU factorization, the LU solve, the matrix3vector prod-
+                  uct with A, and all the operations in one inner GMRES iteration except the pre-
+                  conditioned matrix3vector product, respectively.        In cost(GMRES-IR5), the term
+                  #itouter × (Ér(cA + cMV) + ÉucA) captures the cost of steps 4 and 6 in Algorithm 3.1.
+                  The term #it       ×É (c +c       +c )corresponds to the GMRES initialization over-
+                                 outer   p  A    MV    LU
+                                                                b−1b−1            b−1b−1
+                  head which computes the initial residual U        L Ad −U L r at each call of
+                                                                            i,0            i
+                  GMRES (step 5 of Algorithm 3.1), where d           is the initial guess or starting vector.
+                                                                 i,0
+                  The term #it       ×(É (c     +c )+É c           ) covers the cost of the inner iterations
+                                 inner    p  MV     LU     g GMRES
+                  of GMRES. Finally, the term É c is the cost of the factorization which is computed
+                                                    f F
+                  once.
+                       The actual value of these parameters, in practice, depends on numerous factors
+                  whichareingeneralhardtopredict. Theccoe昀케cients, inparticular, will vary depend-
+                  ing on the matrix being either dense or sparse and, in the latter case, on its structure.
+                  The É coe昀케cients, instead, depend on the properties of the software implementation
+                  and the e昀케ciency of third party libraries (especially in a parallel setting), on the fact
+                  that some operations may include explicit or implicit data conversions, and on the
+                  features of the underlying hardware. Finally the number of outer and inner iterations
+                  depend on the numerical properties of the problem and are, in general, di昀케cult to
+                  predict. It must also be noted that, in order to fully assess the performance of the
+                  proposed methods, a similar model must be de昀椀ned also for the memory consumption.
+                  For all these reason, we will not use this model to draw conclusions on the behavior of
+                  the proposed methods; instead, we refer the reader to [10], [11], [12] for the dense case
+                  and [1] for the sparse case, where actual parallel implementations of these methods
+                  are presented and their performance evaluated on real-life problems.
+                       6. Conclusions. We have addressed the solution of linear systems of equations
+                  by means of iterative re昀椀nement in mixed precision. The renewed interest in this
+                  method stems from the trend for computer hardware to support fast low precision
+                  昀氀oating-point arithmetic. Our baseline is the work by Carson and Higham [5], who
+                  propose a method, GMRES-IR3, that employs up to three precisions and in which
+                  a preconditioned mixed precision GMRES method is used for solving the correction
+                  equation in order to converge on badly conditioned problems. In its original form,
+                  this method requires twice the working precision to be used when applying the pre-
+                  conditioned matrix to a vector, which can be expensive, especially when the working
+                  precision is double precision. By relaxing the assumptions on the precision of the op-
+                  erations within the GMRES solver we have proposed a GMRES-based iterative re昀椀ne-
+                  ment method with up to 昀椀ve di昀昀erent precisions in play, which we call GMRES-IR5.
+                                                              22
+          We extended the rounding error analysis of Carson and Higham to cover GMRES-
+          IR5. As a key component of this analysis, we extended the work of Paige et al. [27]
+          to prove the backward stability of a mixed precision GMRES method. Based on this
+          result we derived conditions on »(A) that guarantee the convergence of GMRES-IR5.
+            Our results show that GMRES-IR5 can accurately and reliably solve relatively
+          badly conditioned problems in potentially lower time and memory than GMRES-IR3
+          thanks to the use of lower precision arithmetic in the GMRES iterations. Although
+          the combined use of multiple precisions results in hundreds or thousands of di昀昀erent
+          variants (depending on how many precisions are available on the system), we provided
+          a list of rules that we used to identify a much smaller set of practical interest; these
+          include variants for which only an experimental evaluation was available prior to this
+          work. Finally, we presented an experimental analysis of the GMRES-IR5 method on
+          randomly generated and SuiteSparse matrices. The experimental results are in good
+          agreement with our theoretical analysis and show that GMRES-IR5 is a robust and
+          versatile method for solving linear systems of equations.
+                             REFERENCES
+                                                       ´
+          [1] P. Amestoy, A. Buttari, N. J. Higham, J.-Y. L’Excellent, T. Mary, and B. Vieuble,
+              Combining sparse approximate factorizations with mixed-precision iterative re昀椀nement,
+              ACM Trans. Math. Softw., 49 (2023), https://doi.org/10.1145/3582493, https://doi.org/
+              10.1145/3582493.
+          [2] C. Boutsikas, P. Drineas, and I. C. F. Ipsen, Small singular values can increase in lower
+              precision, 2023, https://arxiv.org/abs/2303.03547.
+          [3] A. Buttari, J. Dongarra, J. Langou, J. Langou, P. Luszczek, and J. Kurzak, Mixed
+              precision iterative re昀椀nement techniques for the solution of dense linear systems, Interna-
+              tional Journal of High Performance Computing Applications, 21 (2007), https://doi.org/
+              10.1177/1094342007084026.
+          [4] E. Carson and N. J. Higham, A new analysis of iterative re昀椀nement and its application to
+              accurate solution of ill-conditioned sparse linear systems, SIAM J. Sci. Comput., 39 (2017),
+              pp. A28343A2856, https://doi.org/10.1137/17M1122918.
+          [5] E. Carson and N. J. Higham, Accelerating the solution of linear systems by iterative re-
+              昀椀nement in three precisions, SIAM J. Sci. Comput., 40 (2018), pp. A8173A847, https:
+              //doi.org/10.1137/17M1140819.
+          [6] E. Carson, N. J. Higham, and S. Pranesh, Three-precision GMRES-based iterative re昀椀ne-
+              ment for least squares problems, SIAM J. Sci. Comput., 42 (2020), pp. A40633A4083,
+              https://doi.org/10.1137/20m1316822.
+          [7] M. P. Connolly, N. J. Higham, and T. Mary, Stochastic rounding and its probabilistic
+              backward error analysis, SIAM J. Sci. Comput., 43 (2021), pp. A5663A585, https://doi.
+              org/10.1137/20m1334796.
+          [8] cuSOLVER: Direct Linear Solvers on NVIDIA GPUs. https://developer.nvidia.com/cusolver.
+          [9] J. W. Demmel, The probability that a numerical analysis problem is di昀케cult, Mathematics of
+              Computation, 50 (1988), pp. 4493480, http://www.jstor.org/stable/2008617.
+          [10] A. Haidar, A. Abdelfattah, M. Zounon, P. Wu, S. Pranesh, S. Tomov, and J. Don-
+              garra, The design of fast and energy-e昀케cient linear solvers: On the potential of half-
+              precision arithmetic and iterative re昀椀nement techniques, in Computational Science4
+              ICCS 2018, Y. Shi, H. Fu, Y. Tian, V. V. Krzhizhanovskaya, M. H. Lees, J. Don-
+              garra, and P. M. A. Sloot, eds., Springer, Cham, Switzerland, 2018, pp. 5863600,
+              https://doi.org/10.1007/978-3-319-93698-7 45.
+          [11] A. Haidar, H. Bayraktar, S. Tomov, J. Dongarra, and N. J. Higham, Mixed-precision
+              iterative re昀椀nement using tensor cores on GPUs to accelerate solution of linear systems,
+              Proc. Roy. Soc. London Ser. A, 476 (2020), p. 20200110, https://doi.org/10.1098/rspa.
+              2020.0110.
+          [12] A. Haidar, S. Tomov, J. Dongarra, and N. J. Higham, Harnessing GPU tensor cores for fast
+              FP16 arithmetic to speed up mixed-precision iterative re昀椀nement solvers, in Proceedings
+              of the International Conference for High Performance Computing, Networking, Storage,
+              and Analysis, SC18 (Dallas, TX), Piscataway, NJ, USA, 2018, pp. 47:1347:11, https://doi.
+              org/10.1109/SC.2018.00050.
+                                23
+          [13] D. J. Higham, N. J. Higham, and S. Pranesh, Random matrices generating large growth
+              in LU factorization with pivoting, SIAM J. Matrix Anal. Appl., 42 (2021), pp. 1853201,
+              https://doi.org/10.1137/20M1338149.
+          [14] N. J. Higham, Accuracy and Stability of Numerical Algorithms, Society for Industrial and
+              Applied Mathematics, Philadelphia, PA, USA, second ed., 2002, https://doi.org/10.1137/
+              1.9780898718027.
+          [15] N. J. Higham, How fast is quadruple precision arithmetic? https://nhigham.com/2017/08/
+              31/how-fast-is-quadruple-precision-arithmetic/, June 2016.
+          [16] N. J. Higham, Error analysis for standard and GMRES-based iterative re昀椀nement in two and
+              three-precisions, MIMS EPrint 2019.19, Manchester Institute for Mathematical Sciences,
+              The University of Manchester, UK, Nov. 2019, http://eprints.maths.manchester.ac.uk/
+              2735/.
+          [17] N. J. Higham and T. Mary, A new approach to probabilistic rounding error analysis, SIAM
+              J. Sci. Comput., 41 (2019), pp. A28153A2835, https://doi.org/10.1137/18M1226312.
+          [18] N. J. Higham and T. Mary, Sharper probabilistic backward error analysis for basic linear
+              algebra kernels with random data, SIAM J. Sci. Comput., 42 (2020), pp. A34273A3446,
+              https://doi.org/10.1137/20M1314355.
+          [19] N. J. Higham and T. Mary, Mixed precision algorithms in numerical linear algebra, MIMS
+              EPrint 2021.20, Manchester Institute for Mathematical Sciences, The University of Man-
+              chester, UK, Dec. 2021, http://eprints.maths.manchester.ac.uk/2849/. Revised February
+              2022. To appear in Acta Numerica.
+          [20] N. J. Higham and S. Pranesh, Exploiting lower precision arithmetic in solving symmetric
+              positive de昀椀nite linear systems and least squares problems, SIAM J. Sci. Comput., 43
+              (2021), pp. A2583A277, https://doi.org/10.1137/19M1298263.
+          [21] N. J. Higham, S. Pranesh, and M. Zounon, Squeezing a matrix into half precision, with an
+              application to solving linear systems, SIAM J. Sci. Comput., 41 (2019), pp. A25363A2551,
+              https://doi.org/10.1137/18M1229511.
+                  ´
+          [22] A. Kie lbasinski, Iterative re昀椀nement for linear systems in variable-precision arithmetic, BIT
+              Numerical Mathematics, 21 (1981), pp. 973103.
+          [23] J. Lee, G. D. Peterson, D. S. Nikolopoulos, and H. Vandierendonck, Air: Itera-
+              tive re昀椀nement acceleration using arbitrary dynamic precision, Parallel Computing, 97
+              (2020), p. 102663, https://doi.org/https://doi.org/10.1016/j.parco.2020.102663, https://
+              www.sciencedirect.com/science/article/pii/S0167819120300569.
+          [24] Matrix algebra on GPU and multicore architectures (MAGMA). http://icl.cs.utk.edu/magma/.
+          [25] C. B. Moler, Iterative re昀椀nement in 昀氀oating point, J. ACM, 14 (1967), p. 3163321, https:
+              //doi.org/10.1145/321386.321394, https://doi.org/10.1145/321386.321394.
+          [26] T. Ogita, Accurate matrix factorization: Inverse LU and inverse QR factorizations, SIAM J.
+              Matrix Anal. Appl., 31 (2010), pp. 247732497, https://doi.org/10.1137/090754376.
+                       ˇ ´       ˇ
+          [27] C. C. Paige, M. Rozloznık, and Z. Strakos, Modi昀椀ed Gram-Schmidt (MGS), least squares,
+              and backward stability of MGS-GMRES, SIAM J. Matrix Anal. Appl., 28 (2006), pp. 2643
+              284, https://doi.org/10.1137/050630416.
+          [28] S. M. Rump, Inversion of extremely ill-conditioned matrices in 昀氀oating-point, Japan Journal
+              of Industrial and Applied Mathematics, 26 (2009), pp. 2493277.
+                 ´
+          [29] B. Vieuble, Mixed precision iterative re昀椀nement for the solution of large sparse linear systems,
+              PhD thesis, https://hal.science/tel-03975935.
+          [30] J. H. Wilkinson, Rounding Errors in Algebraic Processes, Notes on Applied Science No. 32,
+              HerMajesty’sStationeryO昀케ce, London, 1963. AlsopublishedbyPrentice-Hall, Englewood
+              Cli昀昀s, NJ, USA. Reprinted by Dover, New York, 1994.
+                                24

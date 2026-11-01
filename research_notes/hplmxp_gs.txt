@@ -1,0 +1,519 @@
+                 HPL-MxPBenchmark: Mixed-Precision Algorithms, Iterative Re昀椀nement,
+                                                                        and Scalable Data Generation
+                                                                                                 1, 2, 3                                  4, 1
+                                                                         Jack Dongarra                    and Piotr Luszczek
+                                                                                                                             *
+                                                                                           September 23, 2025
+              Abstract                                                                                        there are gaps dependent on the discipline and data properties with
+              We present a mixed-precision benchmark called HPL-MxP that                                      the larger scienti昀椀c application ecosystem. Updating these gaps
+              uses both a lower-precision LU factorization with a non-stationary                              in terms of simulations’ needs relies on the fundamental software
+              iterative re昀椀nement based on GMRES. We evaluate the numerical                                  libraries that started offering some of the mixed-precision func-
+              stability of one of the methods of generating the input matrix in                               tionality: some of the solvers are available with proven theoretical
+              a scalable fashion and show how the diagonal scaling affects the                                boundsonthequalityoftheresults. Itisimportanttopointoutthat
+              solution quality in terms of the backward-error. Some of the per-                               the protracted sunset of Moore’s Law [1] created a new avenue in
+              formance results at large scale supercomputing installations pro-                               the pursuit of the improvements in hardware performance, namely
+              duced Exascale-level compute throughput numbers thus proving                                    limitingthenumberofbitsoftheprocesseddatathusleadingtonot
+              the viability of the proposed benchmark for evaluating such ma-                                 only new 昀氀oating-point precisions but also much skewed through-
+              chines. We also present the potential of the benchmark to continue                              put rates for low-bit formats, either 昀椀xed- or 昀氀oating-point. This
+              increasing its use with proliferation of hardware accelerators for                              started creating performance inversions for higher precision data
+              AI workloads whose reliable evaluation continues to pose a par-                                 as is the case for the upgrade from NVIDIA Hopper to Blackwell
+              ticular challenge for the users.                                                                GPUs that lowers the performance of the IEEE standard 64-bit
+                  Keywords 昀氀oating point representation, hardware accelerator                                format.
+              of昀氀oading, highperformancecomputing,numericallinearalgebra,                                       Inthisenvironment,theHPL-MxPbenchmark(formerlyknown
+              mixed-precision algorithms                                                                      as HPL-AI) seeks to highlight these emerging convergent trends
+              Acknowledgements                                                                                and provide a uni昀椀ed framework for testing hardware capabilities
+              Research was sponsored by the Department of the Air Force Ar-                                   relevant to both high-performance computing (HPC)andAIwork-
+              ti昀椀cial Intelligence Accelerator and was accomplished under Co-                                loads. On the one hand, the traditional HPC continues focusing
+              operative Agreement Number FA8750-19-2-1000. The views and                                      on high-昀椀delity simulations for modeling phenomena in physics,
+              conclusions contained in this document are those of the authors                                 chemistry, biology, and so on. The specialized mathematical mod-
+              and should not be interpreted as representing the of昀椀cial policies,                            els that drive these computational endeavors require, for the major-
+              either expressed or implied, of the Department of the Air Force or                              ity of their data sets, 64-bit accuracy. On the other hand, the ma-
+              the U.S. Government. The U.S. Government is authorized to re-                                   chine learning and data science methods that fuel advances in AI
+              produce and distribute reprints for Government purposes notwith-                                manage to achieve the desired results at 32-bit and now more of-
+              standing any copyright notation herein.                                                         ten in even lower 昀氀oating-point precision formats. This drastically
+                  ThisresearchusesresourcesoftheOakRidgeLeadershipCom-                                        lesser demand for computational accuracy fueled a resurgence of
+              puting Facility, which is a DOE Of昀椀ce of Science User Facility                                 interest in both new hardware platforms and software implemen-
+              supported under Contract DE-AC05-00OR22725. This research                                       tations of new numerical methods. In combination, both of these
+              also uses resources of the Argonne Leadership Computing Facil-                                  advances and the HPL-MxP benchmark aim to showcase a mix
+              ity, which is a DOE Of昀椀ce of Science User Facility supported un-                               of unprecedented performance levels and accompanying energy
+            arXiv:2509.19618v1  [math.NA]  23 Sep 2025der Contract DE-AC02-06CH11357.                         savings to achieve the simulation, classi昀椀cation, and recognition
+                  This work was partially funded by an NSF Collaborative Re-                                  昀椀delity thought to be only possible with higher-accuracy data for-
+              search Framework: Basic ALgebra LIbraries for Sustainable                                       mats.
+              Technology with Interdisciplinary Collaboration (BALLISTIC), a                                     Toresolve this newly emergent directions in hardware and soft-
+              project of the University of Tennessee 2004541.                                                 ware development, HPL-MxP aims to strike a balance between
+                                                                                                              the divergent trends by delivering a combination of modern algo-
+              1 Introduction                                                                                  rithms and ef昀椀cient use of modern accelerator hardware while si-
+              The use of mixed-precision, while now prevalent across scienti昀椀c                               multaneouslydrawingaconnectiontotheestablishedsolverinside
+              and arti昀椀cial intelligence (AI) applications, is not necessarily uni-                          the decades-old HPL benchmark [2] and its deployment base of
+              form in terms of ubiquity nor in terms of relative performance                                  the largest supercomputing installations in the world. The method
+              gains. As we show in the references, theory, and results below,                                 of choice used in the primary solver is a judicious use of the LU
+                  *Useofthisworkiscontrolledbythehuman-to-humanlicenselistedinExhibit                         factorization in lower precision and the iterative re昀椀nement per-
+              3ofhttps://doi.org/10.48550/arXiv.2306.09267                                                    formed in a manner that brings the solution back to the 64-bit ac-
+                  01 University of Tennessee, 2 Oak Ridge National Laboratory, 3 University of Manchester,    curacy expected from the HPL results. The main innovation of
+              4 MIT Lincoln Laboratory                                                                        HPL-MxP(incontrasttoHPL)liesindroppingtherequirementof
+                                                                                                           1
+           64-bit computation throughout the entire computation and instead         Introduction of GMRES [12] to the iterative re昀椀nement class of
+           opting for low-precision (likely 16-bit or lower) accuracy inside     methods lead to new bene昀椀ts that could be gained both numeri-
+           LU, and a sophisticated re昀椀nement to recover the accuracy lost       cally and in terms of performance. Named GMRES-IR [4], this
+           duringthefactorization. Theiterative method guaranteed to be nu-      method added Krylov subspace iteration thus replacing the orig-
+           merically stable is the generalized minimal residual method (GM-      inal stationary iteration and doing away with its main limitation:
+           RES), which uses application of the L and U factors to serve as       highsensitivity to the matrix conditioning. In fact, ill-conditioning
+           a preconditioner. The combination of these algorithms is demon-       was the original design constraint of GMRES-IR thus the use of
+           strably suf昀椀cient for high accuracy [3, 4] and may be implemented    mixed-precisioncouldbemoreexpansive. Thisallowedmuchbet-
+           in a way that takes advantage of the current and upcoming devices     ter match with the hardware that was progressively 昀椀tted with a
+           for accelerating AI workloads [5, 6].                                 wider variety of 昀氀oating-point formats offering a large range of
+           2 BackgroundandHistoricalPerspective                                  peakcomputelevels. Infact, it was possible to use 3 precisions [3]
+                                                                                 or even 5 precisions [13].
+           Backward numerical stability is a method developed in the                In addition to using the right algorithmic framework to achieve
+           1960s[7, 8] and together with iterative re昀椀nement in higher preci-   convergenceiniterativere昀椀nementanddesiredaccuracyoftheso-
+           sion was to be used to improve the solution to a system of linear     lution vector, there are still multiple issues to be resolved and they
+           equations ýĮ = Ę beyond the accuracy achieved in a uniform pre-       relate mainly to properly done number scaling to 昀椀t the lower-
+           cision scenario. Many methods, either direct or iterative, are able   precision formats [14] and also preserve relevant matrix proper-
+           to achieve low values for ∥ýĮ −Ę∥ such that it can be bound by        ties [15].  Note that numerical solvers differ in this respect to
+           the corresponding norms of ý, Į, and Ę scaled by a slow-growing       the number scaling techniques employed for ML and AI models,
+           function of Ĥ or the size of the matrix ý as well as the vectors Į    which use some form of microscaling that was initially proposed
+           and Ę. In this classical view, the iterative re昀椀nement was only an   for the large scale large language model workloads [16].
+           optional component because the original solution was suf昀椀ciently
+           accurate provided that an accurate method was used to solve the          The main reason for using the combination of mixed-precision
+           original system.                                                      and iterative re昀椀nement is to adapt to hardware platform’s com-
+             The assumption of the initial solution being accurate enough        pute capabilities thus obtaining superior performance and energy
+           breaks down in many practical settings, for example when using        consumption. These aspects were extensively studied [5, 6] on
+           threshold pivoting for sparse or dense matrix factorizations [9] or   NVIDIA’s GPU accelerators along with more nuanced aspects
+           even more complex error compensation methods [10]. In such sit-       that were introduced into the solvers when Krylov subspace meth-
+           uations, the solver is often not as backward-stable as possible be-   ods were integrated into the mixed-precision iterative re昀椀nement.
+           cause it trades off its performance for lower accuracy, which then    Amongothers,thesenewconsiderationsincludeaccelerating con-
+           has to be improved in the iterative re昀椀nement stage. Thus this sec-  vergence [17, 18], numerical stability [19, 20], synchronization
+           ond stage becomes the integral part of the solution process and       cost [21], communication pipelining [22], loss of orthogonal-
+           relies heavily on the quality of the solution vector Į computed in    ity [23, 24, 25, 26], and 昀氀exible variants for non-constant precon-
+           the 昀椀rst stage. Another aspect that we dive into shortly is the con- ditioners [27]. Unfortunately, most of these topics are too broad
+           ditioning of the system matrix ý, which may be too high to allow      to be within the scope of this writing but might need to be ex-
+           alessaccuratesolverresultingintheiterativere昀椀nementbeingun-          plored further by the implementers of the benchmark depending
+           able to recover the desired accuracy. This is often manifested by     on the target hardware platform’s processing capabilities and data
+           the iterations diverging or permanently stagnating.                   formats.
+             Iterative re昀椀nement with arti昀椀cially lowered precision was orig-     Asuccessful launch and progress of a benchmark may be mea-
+           inally advocated for the LU factorization [11]. This was an exam-     sured by the scale and type of the machines, on which it can be
+           ple of purposefully lowering the accuracy of the L and U factors      run.   By that metric alone, HPL-MxP now was ported to and
+           of the LU factorization in order to gain performance in the time-     subsequently optimized on the largest supercomputers recorded
+           consuming portion of computing the solution. To keep the accu-        on TOP500 list. In fact, it was one of the very 昀椀rst codes that
+           racy in line with the expectations for the high-precision solver, the recorded Exascale-level performance with 1 Exa-OP recorded on
+           iterative re昀椀nement was used to recover the digits lost due to the   a CPU-only Supercomputer Fugaku [28] with only slightly over
+           use of a lower-precision. This is the aforementioned change in        0.4 E昀氀op/s recorded for HPL. A different implementation was re-
+           the purpose of the solution re昀椀ning iterations: they became the      quired to achieve scalable code for the largest machines with GPU
+           method to bring the accuracy back to the acceptable level rather      accelerators, and there are usually GPU-speci昀椀c considerations to
+           thansimplyaddafewdigitsofextraprecisionbeyondwhatispos-               be taken into account [29]. Such efforts led to nearly 10 Exa-OP
+           sible when using a uniform precision algorithm. The motivating        of achieved performance while still maintaining the accuracy of
+           reasonforthisincreasedsolvercomplexitywastheachievableper-            the HPL code. It is necessary to stress the difference between the
+           formancegain: atthetimeitwasasymptotically2×fasterformost             performance metrics of HPL and HPL-MxP since they use dras-
+           commodity and high-end hardware and could be even higher on           tically different 昀氀oating-point formats that exhibit a range of be-
+           specialized hardware or in situation when a combination of hard-      haviors that may not be suitable for all users. However, the for-
+           ware arithmetic and software emulation were used. The accuracy        mula to compute these 昀椀gures of merit is identical for both codes:
+           could be guaranteed with low values of the condition number of         2Ĥ3×Ī−1 with Ĥ being the input matrix or vectors sizes and Ī be-
+                                                                                  3
+           the original system matrix Ą(ý) relative to the unit roundoff of the  ing the time for solver phases including the iterative re昀椀nement in
+           lowerprecision īlow rather than the traditional requirement that re-  case of HPL-MxP. At the same time, the precision and accuracy
+           lies to conditioning with respect to the higher precision roundoff    for both the inputs and outputs is treated in the same manner thus
+           ī   .                                                                 giving a similar numerical guarantees. Only the internal details of
+            high
+                                                                               2
+           bothcomputeandstorageforHPL-MxPremainthenotablediffer-                    Benchmarking of mixed-precision methods for sparse matrices
+           ence.                                                                  was proposed [41] as an HPG-MxP benchmark or HPC GMRES
+           3 RelatedWork                                                          in mixed-precision. The reported results indicate speedups at scale
+                                                                                  onlarge supercomputing installations.
+           Mixed-precision hardware brings about not just new data formats
+           but may also violate the typical behavior of 昀氀oating-point arith-     4 Algorithmic Framework
+           metic. For example, monotonic summation satis昀椀es the property         ThemainpurposeofrunningtheHPL-MxPbenchmarkistosolve
+                            ¯          ¯                          ¯   ¯
+           that for any Į < Į and į < į implies FP(Į+į)fFP(Į+į), which            a system of linear equations represented by a matrix ý to 64-bit
+           is requested by the IEEE 754 standard but may be violated in           昀氀oating-point accuracy by 昀椀rst performing a mixed-precision fac-
+           the recent hardware [30]. With only mild assumptions about the         torization of a matrix with the minimum precision required for
+           monotonicity of the 昀氀oating-point arithmetic the bisection eigen-     the factors to be FP16 following the available numerical analy-
+           value methods are accurate and numerically stable [31]. This al-       sis [4, 3]. Then an approximate solution Į0 is computed from the
+           lows one to recursively compute the selected eigenvalues of a ma-      low-precision factors Ĉ and đ. The standard LU decomposition
+           trix with the bisection eigenvalue algorithm [31] that also applies    can be used for this task and no partial pivoting is required (but
+           for bidiagonal matrices resulting from SVD [32].                       maybebene昀椀cialinamorespeci昀椀capplication setting) due to the
+             Whencomputingeigenvalues for some matrices with the bisec-           way that the system matrix ý is generated as described below in
+           tion method, the intermediate values produced in the Sturm func-       the section on matrix generation. Second, the approximate solu-
+           tion can grow or shrink monotonically as they are processed along      tion Į0 is used as the initial vector for a non-stationary iterative
+           the diagonal and for the off-diagonal elements. Thus related to        method in 64-bit precision to generate subsequent improvements
+           the mixed-precision context, for the very large matrix sizes this      to the initial low-precision approximation to generate a 昀椀nal so-
+           could result in an under昀氀ow or over昀氀ow as established by mixed-      lution Į昀椀nal that should attain the accuracy achieved by the LU
+           precision eigensolvers [33]. Consequently, the remedial scaling        decomposition in 64-bit 昀氀oating-point arithmetic such as the one
+           techniques may be borrowed to 昀椀t the limited exponent and man-        that is computed by HPL. GMRES [12, 27] is the method recom-
+           tissa of the lower-precision 昀氀oating-point representations.           mended for the re昀椀nement’s non-stationary iteration because it is
+             Iterative re昀椀nement was originally suggested and analyzed in        numerically stable [4, 3] when using the low-precision LU factors
+           numerical roundoff errors [7, 8] and was deemed bene昀椀cial pro-        as a left-side preconditioner in this iterative algorithm.
+           videdtheaccumulationoftheresidualvectorentriesareperformed                The benchmark implementations should use the equivalent of
+           in higher precisions. Then it was proposed [11] instead to lower       the original HPL benchmark harness [2] with a suitable modi昀椀ca-
+           the precision of the input matrix and to use the re昀椀nement iteration  tions in the matrix generator code, which needs to produce a non-
+           for bringing back the lost digits. The potential conditioning issues   symmetric random matrix that admits non-singular LU decompo-
+           were subsequently addressed by introduction of Krylov subspace         sition in 64-bit 昀氀oating-point without partial pivoting. We explore
+           methods[4]andthree-precisionre昀椀nementasproposedearlier[3].            this in more detail in sections on matrix generation and experimen-
+           This concept was later taken further in direct sparse solvers [13]     tal results. Note that the matrices that produce diagonal elements
+           with the use of up to 昀椀ve precisions in re昀椀nement.                   slightly below the actual pivots from partial pivoting would result
+             In a similar fashion, Cholesky QR is an example of an estab-         in faster element growth and thus require more iterations in the
+           lished method that could leverage a mixed-precision approach.          subsequent re昀椀nement [42].
+           This allows utilization of a higher precision format to maintain          Duetothenumberofbuilt-in options to choose from when im-
+           accuracy otherwise not possible in a uniform precision scenario as     plementing HPL-MxP there is an inherent need to require a con-
+           observed in numerical experiments [34].                                sistent way of obtaining reliably a 昀椀gure of merit representing the
+             Within the 昀椀eld of Krylov subspace methods, GMRES received          result of running a particular implementation of the benchmark.
+           attention early [35] and improved on newer hardware [36] so that       In order to obtain this kind of uniformity across all computing
+           the mixed-precision could bene昀椀t the time-to-solution but with a      platforms and make the reported performance we require that the
+           potential increase in the iteration count due to stagnation of con-    implemented algorithm for solving the low-precision representa-
+           vergence when one of the precisions was lowered excessively or         tion of the input system of equations must numerically conform
+           the prerequisite properties of the matrix were not met.                to an LU factorization. Speci昀椀cally, we require that the total op-
+             Mixed precision is also possible for 昀椀nding eigenvalues and         eration count in that phase of the algorithm must be on the order
+           eigenvectors of symmetric and Hermitian matrices as shown [37]         of 2Ĥ3+ċ(Ĥ2) in terms of 昀氀oating-point operations even though
+           for a variety of GPU accelerators with speedups depending on the           3
+                                                                                  64-bit precision arithmetic is not required in contrast to the rules
+           disparity between lower- and higher-precision hardware units.          for HPL.
+             Mixed-precisionwasalsoproposedforJacobiSVD[38,39]im-                    BorrowingfromtheHPL’stestingharness,HPL-MxPcomputes
+           proving signi昀椀cantly upon the earlier methods.                        a backward-error upon the completion of the solver and after the
+             Newton iteration can also be performed inside a mixed-               convergenceofthere昀椀nementiterations. Theformulausedforthis
+           precision framework to achieve orthogonalization of eigenvector                                                       −1          −1
+           when the lower-precision scheme failed to deliver suf昀椀cient nu-       purpose is ∥ýĮ−Ę∥∞×(∥ý∥∞∥Į∥∞+∥Ę∥∞) ×(Ĥ×Ċ) ,where
+                                                                                  Ċ is the machine precision in 64-bit 昀氀oating point arithmetic. On
+           merical quality [33].                                                                                        −53
+                                                                                  the IEEE-compliant hardware Ċ is 2        in binary [43, 44]. The use
+             A more extreme case of utilizing mixed-precision schemes is          of Ĥ or the size of the input matrix and vectors allows us to remove
+           to switch exclusively to integer compute units [40]. This is per-      the restriction on the system size. The correct solution is assumed
+           formed with emulation of 昀氀oating-point representation and can         if the backward-error formula is less than 16. Otherwise, the run
+           only deliver performance bene昀椀ts if the 昀氀oating-point units are      is deemed invalid. However, this form of the quality criterion and
+           severely under-provisioned in terms of compute capability.             the upper bound on the backward error are made to strictly con-
+                                                                                3
+                                     ý1,1                                        tions roughly estimated by the canonical operations from the for-
+                                             32bits                              mula for the asymptotic execution rate. Then the GMRES itera-
+                                                                                 tions re昀椀ne the solution to meet the accuracy criterion designed
+                                      32                                         for the 64-bit 昀氀oating-point arithmetic. This phase would include
+                                             16bits                              the use of the lower-precision LU factors as a left-preconditioner.
+                                      bits                                       Onlyahandfulofiterations is expected to lead to convergence but
+                                                                                 the global synchronizations could make this phase relatively long
+           Figure 1: Computation of the Schur complement with higher-            in duration. If the particular implementation needs more than 50
+           precision devoted to accumulation of the trailing matrix.             iterations to converge then the code should trigger a failure, and
+                                                                                 the run is considered invalid. This tends to strike the balance be-
+                                                                                 tween the quality of the low-precision L and U factors and the
+           formwiththestandardestablished by HPL so that the new mixed-          performance of the re昀椀nement process: only a handful of itera-
+           precision method with iterative re昀椀nement is guaranteed the same     tions are commonly needed in practice. Finally, if either balancing
+           level of accuracy. For a speci昀椀c application, this may be relaxed    or scaling was performed at the beginning, then their effects have
+           or tightened depending on the upstream requirements imposed on        to be undone in order to project it back onto the space of the input
+           the linear solver.                                                    matrix. The time to compute the backward error is not included
+             As was already mentioned before, the lower-precision formats        and thus may be performed by an unoptimized piece of code.
+           are muchmoreconstrainedthanthe64-bit昀氀oating-pointnumbers.               Conceptually, the solver is simple and results from a well re-
+           Tocompensate,theimplementationsarepermittedtoperformbal-              searched set of numerical methods. However, there are many cru-
+           ancing and scaling of the input matrix. The former is again bor-      cial details that may be lost by the implementer when considering
+           rowed directly from the HPL testing harness and requires Θ(Ĥ2)        the inherent complexity of the modern supercomputing hardware
+           operations to improve the distribution of matrix elements’ values.    platforms. For this reason we have provided a reference imple-
+           ThisdirectlyaffectsthequalityoftheLandUfactorsaswellasthe             mentation whosesolepurposeistoshowhowthebenchmarkcode
+           speedofconvergenceofthere昀椀nementprocess. Thelatterismore             couldlooklikeinitiallybeforethehardware-speci昀椀coptimizations
+           speci昀椀c to mixed-precision methods and is meant to transform the     are attempted. By no means do we expect this reference code to
+           numbers so that they 昀椀t within the range of the lower-precision      deliver near-optimal performance results, but at the same time it
+           昀氀oating-point formats chosen by the implementation. Note how-        should be possible to use it for estimation of a good initial indica-
+           ever that the time consumed by both balancing and scaling must        tor of the hardware’s capability. Further optimizations should cer-
+           be included in the total time to solution.                            tainly be done to obtain a publishable result. As was the case with
+             The implementation of the LU factorization is permitted to use      other benchmarks [2, 45, 46, 47], the hardware vendors and com-
+           a custom mixed-precision scheme during the construction of the        munity provided such optimized implementations that now cover
+           L and U factors. In Figure 1, we show an example of such a            CPUsandallmajorGPUsusedinthehighendHPCsystems.
+           scheme whereby the panel factorization and triangular solves are      5 HighLevelLanguageImplementation
+           done in 32-bit arithmetic while the Schur complement or the up-       There are increasing bene昀椀ts of using higher-level languages to
+           date of the trailing matrix is computed exclusively in 16-bit arith-  implement mixed-precision solvers. On the one hand, low-level
+           metic but with 32-bit accumulation of the result.      This is per-   programming languages such as the C language [48] are miss-
+           formed with a matrix-matrix multiplication of the form ý2,2 ←         ing convenient support for generic programming with only a rudi-
+           ý2,2 −ý2,1×ý−1 ×ý1,2. This is possible on NVIDIA hardware             mentary functionality available by using C11 standard’s Generic()
+                           1,1
+           that has compute units capable of performing such an operation at     macro feature. On the other hand, the C++ language [49] offers
+           muchhigherrate than is the case for the larger data formats.          higher level facilities to ease the generic interface design and pro-
+             The 昀椀gure of merit is the rate of execution computed exactly       vides implementation mechanism through templates for multiple
+           as the number of canonical operations performed by HPL or             precisionsco-existinginasinglecodebasewhiletheC++concepts
+           2Ĥ3+3Ĥ2. This formula is composed of 2Ĥ3− 1Ĥ2 LU factor-              allow the implementers to provide robust checking of the template
+           3      2                   2                 3      2
+           ization operations and 2Ĥ subsequent operations for both back-        parameters supplied by the users and thus clearly indicate poten-
+           and forward-substitution solves. The canonical operation count is     tial syntax errors concisely and consistently as long as one of the
+           divided by the total time-to-solution, which then is reported as the  newer language standards are used starting with C++20 onward.
+           昀椀nal rate of operations per second. They are not the traditional     In an even newer efforts, the <linalg> header 昀椀le was added to
+           昀氀op/s since the 昀氀oating-point operations are likely to be different the standard library and was recently approved for inclusion in the
+           at different stages of the computation.                               ISO C++26 standard edition. The full speci昀椀cation as proposed
+             Only the canonical operation count is used in the asymptotic        through the multiple subcommittee working versions of the pro-
+           compute rate. However, the time-to-solution value accumulates         posal are available as P1673 [50]. The plethora of customization
+           many operations required to compute an accurate solution vec-         points allow an easy adaptation of these upcoming interface de-
+           tor. This could potentially include a number of subsequent phases.    signs to our needs in a mixed-precision iterative re昀椀nement set-
+           Namely, the optional balancing and/or scaling operations are per-     ting.
+           formed 昀椀rst on the input matrix in case over昀氀ow or under昀氀ow is     6 MatrixGeneration
+           suspected to occur, and it must be prevented to improve re昀椀ne-
+           ment iteration convergence. Then the LU factorization is com-         Scalable input data generation is essential for benchmarking large
+           puted in lower precision, which often would be the most consum-       supercomputing installations as was observed repeatedly [2, 45,
+           ing part of the process since it would need the number of opera-      46, 47, 51], and it was indicated that the lack of customizable in-
+                                                                               4
+           puts lead to eventual stagnation of deployment leading to irrele-        of numerical accuracy and pass the standard HPL criterion for re-
+           vance on constantly growing high-end systems. We will introduce          sults’ validity, it is necessary to 昀椀rst generate the input matrix that
+           here a few potential solutions to this problem for HPL-MxP and           admits non-singular L and U factors in 64-bit arithmetic without
+           later provide experimental results supporting yet another matrix         the use of partial pivoting. At the same time we aim at only a
+           generation scheme suitable for arbitrarily large benchmark runs.         mild pivot growth so that the computed factors do not lose addi-
+           The main property required from the input matrix is that, by con-        tional digits of accuracy, which then would have to be recovered
+           struction, it should admit non-singular L and U factors in 64-bit        by the GMRES-based iterative re昀椀nement. Finally, we also need
+           precision without the use of pivoting for numerical stability. Ma-       to avoid excessive scaling of the diagonal elements after generat-
+           trices causing a large pivot growth are clearly out of scope [52, 53].   ing uniformly random matrix elements so that the diagonal and
+           Another requirement is to maintain spectral properties of the ma-        off-diagonal entries contribute in a balanced fashion to the entries
+           trix that makes it challenging for an unpreconditioned GMRES so          of the solution vector. To measure this trade off, we measured
+           that generating a non-trivial preconditioner in the form of LU fac-      the largest pivot value chosen by the standard LU factorization in
+           torization is a must. This is addressed by the generators described      64-bit 昀氀oating-point arithmetic. Figure 2 shows with red dots the
+           below.                                                                   pivots for a wide range of matrix sizes for uniformly random ma-
+              Non-symmetric positive-de昀椀nite matrices may be easily proven         trices with values between −1 and 1 without scaling. In order to
+           to not require pivoting in the LU factorization. Examples of such        estimate the relevant pivot size, we also included in the 昀椀gure the
+           matrices can be easily generated from random matrices by scal-           analytical curves as a function of input matrix size Ĥ. The effec-
+           ing the diagonal by the matrix size Ĥ. However, we consider such         tive upper bound on the pivot value is √Ĥ, which is in line with
+           input matrices to only serve as a good starting point for debug-         the random matrix theory [56, 57]. However, the majority of the
+           ging and tuning purposes but should not be used in production            pivot values are lower than the theoretical results suggest. In order
+           runs for of昀椀cial results because of how it distorts the matrix spec-    to estimate the relative size of these smaller pivots, we also show
+           trum, causes under昀氀ow for off-diagonal elements, produces easily        analytical curves for 5√Ĥ and Ĥ0.45. Both of them are a good esti-
+                                                                                                          8
+           predictable solution vectors without the need of performing many         mateforthesesmallestpivots, but the square root function follows
+           of the essential computations that form the basis of the mixed-          the trend better and should be preferred in the pivot and scaling
+           precision solver that requires non-stationary iterative re昀椀nement.      formulas.
+              Instead of scaling the diagonal by the matrix size, a much more          It is also worth noting that the largest pivot value occurs in the
+           constrained diagonal scaling was named departure from diagonal           last 1% of the columns, which corresponds well with the intu-
+           dominance and was proposed for a matrix generator [51]. This             ition that the accumulation of trailing matrix updates would be the
+           made the generated matrices challenging for unpreconditioned             largest around the very bottom end of the diagonal. We observed
+           GMRESsothatnospuriouslyfastconvergenceoccursinlessthan                   similar effects for Wilkinson matrices in a completely different
+           50 iterations. In fact, over 700 iterations were observed for larger     numerical context [33].
+           matrices to achieve full convergence without a preconditioner.              Figure 3 shows the three common residual norms that could be
+              An alternative method was proposed [54] based on the one-             used for computing backward-error of the LU factorization with
+           parameter matrix introduced earlier [55]. While the original def-        partial pivoting in 64-bit 昀氀oating-point arithmetic. The input ma-
+           inition was predictable, the further modi昀椀cations introduced ran-       trix elements were drawn from a uniformly random distribution of
+           domization and controlled condition number thus regulating suit-         values between −1 and 1 without any additional scaling of diago-
+           ability for the benchmark based on additional parameters. The            nal elements. Also, these norms directly determine if the criterion
+           only drawback could be the necessity for a non-linear solver to          was satis昀椀ed to render the solution vector as valid. Obviously,
+           arrive at some of the matrix generator parameters.                       by their de昀椀nitions, these norms are connected by the scaling fac-
+              Another option is to judiciously select either uniform or Gaus-       tors: √Ĥ∥·∥     f∥·∥ f√Ĥ−1∥·∥ , which we can con昀椀rm with
+           sian random distributions for the matrix elements because those                        ∞        2             1
+           canpositively regulate the spectrum of the generated matrices thus       the 昀椀gure’s plots. However, this is not the purpose of the 昀椀gure.
+           directly affecting the convergence pro昀椀le of a Krylov solver [51].      Instead, we point out the variance values around the hypothetical
+                                                                                    trend line for the computed norms across the tested matrix sizes.
+           7 ExperimentalResults                                                    Eventhoughallthreevariancevaluesmayseemrelativelysmallin
+           In this section, we show several of numerical experiments that at-       the 昀椀gure, we note that the logarithmic scale is used for the į-axis,
+           tempt to illustrate some of the numerical aspects of the computa-        andthusthevisually small variance is still large in absolute terms.
+           tion of the LU factorization that is essential for HPL-MxP and was       Also, the biggest variance is associated with the smallest norm,
+           not yet covered by the references provided so far. We focus on the       which may cause larger changes in the backward errors computed
+           reproducibility aspects in our experiments and thus we chose the         withthatnormandthusmaypotentiallycontributetothefailureof
+           input data sizes to easily 昀椀t on most CPU and GPU systems while         the the passing criterion and render the result invalid simply due to
+           at the same time are large enough to show relevant trends in nu-         anaturalvariabilityintheinputmatrixdata. Finally, the昀椀gurewill
+           merical roundoff giving the reader an opportunity to compare with        serve as the basis for comparing with the LU factorization without
+           the theoretical results provided in the included references. This        any pivoting to give us a better idea about the need for optimal
+           limited the sizes we used to 46340 or the largest value that 昀椀ts in     scaling of the diagonal entries of the input matrix in order to avoid
+           a 32-bit integer, and even 32-bit BLAS can be used to produce            an excessive element growth in the computed L and U factors.
+           the presented results. The experimental results focus on matrices           Figure 4 shows the three common residual norms that could be
+           with uniformly distributed random elements because the normally          used for computing backward-error of the LU factorization with-
+           distributed entries are better behaved in practice [51].                 out partial pivoting in 64-bit 昀氀oating-point arithmetic. The input
+              Aswementionedearlier,inordertoachieveanacceptablelevel                matrixelementswereagaindrawnfromauniformlyrandomdistri-
+                                                                                  5
+                        200
+                        150
+                        100
+                         50                                                                                             pivot value
+                                                                                                                          n
+                                                                                                                        0.625 n
+                           0                                                                                            n0.45
+                                  0                 10000                20000               30000                40000
+                                                                            Matrix size
+           Figure2: Thelargestpivotvalueselected(reddots)forrandommatricesofdifferentsizesandtheirrelativesizecomparedtotheoretical
+           growth curves.
+           bution of values between −1 and 1 without any additional scaling      algebra research community. We showed how these algorithms
+           of diagonal elements, which matches the input matrices from Fig-      were proposed based on the initial stationary iterative re昀椀nement
+           ures 2 and 3. The combination of the lack of diagonal scaling and     designbyloweringtheprecisionofintermediatecomputationsand
+           not using partial pivoting contributes to catastrophic deterioration  introducing Krylov subspace iteration. We also presented a num-
+           of the values of the residual norms. We can estimate that each        berofsuitablechoicesforthescalablematrixgeneratorthatmakes
+           of the norms increased by 2 to 3 orders of magnitude when min-        partial pivoting in the LU factorization optional while still allow-
+           imumnormvalues are compared, which constitutes an optimistic          ing the L and U factors to serve as a left-preconditioner for the
+           scenario and is not that common for the tested input matrix sizes.    GMRES iteration, which is a preferred way to re昀椀ne the initial
+           The pessimistic cases have norms larger by as much as 5 orders        solution to achieve full 64-bit accuracy irregardless of the inter-
+           of magnitude. And the number of these worst-case occurrences is       mediate storage and compute formats. The reported results have
+           large enough to warrant application of preventive measures. What      already achieved several Exa-operations per second and many op-
+           contributes to such a disparity between the best- and worst-case      timized implementations exist to allow the users to test a variety
+           scenarios is greatly increased variance of the norm values around     of their systems based on CPUs, GPUs, or a combination of both.
+           the trend line.                                                          Oneofthefuture research directions is to investigate the recent
+             The combined results presented in Figures 2, 3, and 4 indicate      advances in Generalized Random Butter昀氀y Transform proposed
+           that suitable scaling of the diagonal elements of the input matrices  for the Gaussian Elimination[58]. Thismayofferyetanotherscal-
+           is essential to achieve suf昀椀ciently accurate L and U factors in 64-  able method for generating input matrices that by construction do
+           bit precision. The bene昀椀ts would be further compounded for even      not require pivoting.
+           lower compute precisions. The conditioning and roundoff error            Finally, we envision an ongoing effort of continuously improv-
+           analysis based on random matrix theory suggest the relevant scal-     ing the reference implementation and collecting the results from
+           ingof√Ĥ,butitcouldbeloweredattheexpenseofmoreiterations               the newly introduced supercomputing systems. Improving the val-
+           in the mixed precision re昀椀nement process.                            idation proceduresisalsoanimportantaspectforabenchmarkthat
+           8 ConclusionsandFutureWork                                            strives for maintaining relevance and longevity.
+           WepresentedtheHPL-MxPbenchmarkwithabackdropofacom- References
+           bination of mixed-precision and iterative re昀椀nement methods that       [1] G. E. Moore. Cramming more components onto integrated
+           have recently received much attention from the numerical linear             circuits. Electronics, 38(8), 1965.
+                                                                               6
+                        10 5
+                        10 7
+                        10 9
+                       10 11
+                       10 13                                                                                          Ax b
+                                                                                                                               1
+                                                                                                                      Ax b 2
+                                                                                                                      Ax b
+                                   0                10000              20000               30000              40000
+                                                                           Matrix size
+                             Figure 3: Three norms of the solution vector of a solver with pivoting for different matrix sizes.
+           [2] Jack J. Dongarra, Piotr Luszczek, and Antoine Petitet.               tionery Of昀椀ce, London, 1963. Also published by Prentice-
+                The LINPACK benchmark:          Past, present, and future.          Hall, Englewood Cliffs, NJ, USA. Reprinted by Dover, New
+                Concurrency and Computation: Practice and Experience,               York, 1994.
+                15(9):8033820, August 10 2003.      DOI: 10.1002/cpe.728.      [8] James H. Wilkinson. The Algebraic Eigenvalue Problem.
+                ISSN1532-0634.                                                      pub-OUP, 1965.
+           [3] Erin Carson and Nicholas J. Higham. Accelerating the solu-      [9] Neil Lindquist, Mark Gates, Piotr Luszczek, and Jack Don-
+                tion of linear systems by iterative re昀椀nement in three preci-      garra. Threshold pivoting for dense LU factorization. In
+                sions. SIAM J. Sci. Comput., 40(2):A8173A847, 2018.                 ScalAH22: 13th Workshop on Latest Advances in Scalable
+           [4] Erin Carson and Nicholas J. Higham. A new analysis of it-            Algorithms for Large-Scale Heterogeneous Systems, pages
+                erative re昀椀nement and its application to accurate solution of      1310, Dallas, Texas, USA, November 14, 2022.
+                ill-conditioned sparse linear systems. SIAM J. Sci. Comput.,  [10] Neil Lindquist, Piotr Luszczek, and Jack Dongara. Using ad-
+                39(6):A28343A2856, 2017.                                            ditive modi昀椀cations in LU factorization instead of pivoting.
+           [5] Azzam Haidar, Stanimire Tomov, Jack Dongarra, and                    In International Conference on Supercomputing (ICS) 2023,
+                Nicholas J. Higham. Harnessing GPU tensor cores for fast            pages 14324, Orlando, Florida, USA, June 2023. Best paper
+                FP16arithmetic to speed up mixed-precision iterative re昀椀ne-        nominee.
+                mentsolvers. InProceedingsoftheInternationalConference        [11] Julie Langou, Julien Langou, Piotr Luszczek, Jakub Kurzak,
+                for High Performance Computing, Networking, Storage, and            Alfredo Buttari, and Jack Dongarra. Exploiting the perfor-
+                Analysis, SC ’18. IEEE Press, 2018.                                 mance of 32 bit 昀氀oating point arithmetic in obtaining 64 bit
+                                                                                    accuracy (revisiting iterative re昀椀nement for linear systems).
+           [6] A. Haidar, H. Bayraktar, S. Tomov, J. Dongarra, and N. J.            In Proceedings of the 2006 ACM/IEEE Conference on Su-
+                Higham. Mixed-precision iterative re昀椀nement using tensor           percomputing, SC ’06, page 1133es, New York, NY, USA,
+                cores on gpus to accelerate solution of linear systems. Pro-        2006. Association for Computing Machinery.
+                ceedingsoftheRoyalSocietyA,476(2243),November2020.            [12] Y. Saad and M. H. Schultz. GMRES: a generalized minimal
+           [7] James H. Wilkinson. Rounding Errors in Algebraic Pro-                residual algorithm for solving nonsymmetric linear systems.
+                cesses. Notes on Applied Science No. 32, Her Majesty’s Sta-         SIAMJ.Sci. Stat. Comput., 7:8563869, 1986.
+                                                                            7
+                         100
+                        10 2
+                        10 4
+                        10 6
+                        10 8
+                       10 10
+                                                                                                                     Ax b 1
+                       10 12                                                                                         Ax b 2
+                                                                                                                     Ax b
+                                   0               10000              20000               30000              40000
+                                                                          Matrix size
+                           Figure 4: Three norms of the solution vector of a solver without pivoting for different matrix sizes.
+          [13] Patrick R. Amestoy, Alfredo Buttari, Nicholas John Higham,    [17] A. H. Baker. On Improving the Performance of the Linear
+                                           ´                             ´
+               Jean-Yves L’Excellent, Theo Mary, and Bastien Vieuble.              Solver restarted GMRES. PhD thesis, University of Col-
+               Five-precision gmres-based iterative re昀椀nement.   SIAM J.          orado, 2003.
+               Matrix Anal. Appl., 45:5293552, 2024.                         [18] A.H.Baker,E.R.Jessup,andT.Manteuffel. Atechniquefor
+                                                                                   accelerating the convergence of restarted GMRES. SIAM J.
+          [14] Piotr Luszczek, Jakub Kurzak, Ichitaro Yamazaki, and Jack           Matrix Anal. Appl., 26(962), 2005.
+               Dongarra. Towards numerical benchmark for half-precision                      ˇ  ˇ                                    ˇ ´
+               昀氀oating point arithmetic. In 2017 IEEE High Performance      [19] Jitka Drkosova, Anne Greenbaum, Miroslav Rosloznık, and
+                                                                                        ˇ        ˇ
+               Extreme Computing Conference (HPEC), Waltham, Mas-                  Zdenek Strakos. Numerical stability of GMRES. BIT Nu-
+               sachusetts, USA, 2017.                                              merical Mathematics, 35:3093330, September 1995.
+                                                                             [20] Christopher C. Paige and Zdenvek Strakos. Residual and
+          [15] Nicholas J. Higham, Srikara Pranesh, and Mawussi Zounon.            backward error bounds in minimum residual Krylov sub-
+               Squeezingamatrixintohalfprecision,withanapplicationto               space methods.   SIAM J. Sci. Comput., 23(6):189831923,
+               solving linear systems. SIAM Journal on Scienti昀椀c Comput-          June 2001.
+               ing, 41(4):A25363A2551, 2019.                                          ´
+                                                                             [21] K.Swirydowicz,J.Langou,ShreyasAnanthan,U.Yang,and
+                                                                                   S. Thomas. Low synchronization Gram-Schmidt and GM-
+          [16] Bita Rouhani, Daniel Lo, Ritchie Zhao, Ming Liu, Jeremy             RES algorithms. Numerical Linear Algebra with Applica-
+               Fowers, Kalin Ovtcharov, Anna Vinogradsky, Sarah Mas-               tions, 2019.
+               sengill, Lita Yang, Ray Bittner, Alessandro Forin, Hais-      [22] Siegfried Cools, Jeffrey Cornelis, and Wim Vanroose. Nu-
+               han Zhu, Taesik Na, Prerak Patel, Shuai Che, Lok Chand              merically stable recurrence relations for the communication
+               Koppaka, Xia Song, Subhojit Som, Kaustav Das, Saurabh               hiding pipelined conjugate gradient method. IEEE Trans-
+               Tiwary, Steve Reinhardt, Sitaram Lanka, Eric Chung, and             actions on Parallel and Distributed Systems, 30(11):25073
+               Doug Burger. Pushing the limits of narrow precision in-             2522, 2019.
+               ferencing at cloud scale with microsoft 昀氀oating point.   In
+                                                                                   ˚      ¨
+               34th Conference on Neural Information Processing Systems      [23] Ake Bjorck and Christopher C. Paige.       Loss and recap-
+               (NeurIPS 2020), Vancouver, Canada, 2020.                            ture of orthogonality in the modi昀椀ed Gram-Schmidt algo-
+                                                                           8
+                rithm. SIAM Journal on Matrix Analysis and Applications,      [35] J. D. HoggandJ.A.Scott. Afastandrobustmixed-precision
+                13(1):1763190, 1992.                                                solver for the solution of sparse symmetric linear systems.
+                                                                                    ACMTrans.Math.Softw., 37(2):17:1317:24, April 2010.
+                                                          ´
+          [24] Christopher C. Paige, Miroslav. Rozloznık, and Zdenvek.
+                Strakos. Modi昀椀ed Gram-Schmidt (MGS), least squares, and      [36] Neil Lindquist, Piotr Luszczek, and Jack Dongarra. Improv-
+                backward stability of MGS-GMRES. SIAM J. Matrix Anal.               ing the performance of the GMRES method using mixed-
+                Appl., 28(1):2643284, 2006.                                         precision techniques. In Proceedings of Smokey Mountain
+                                                                                    Conference, virtual, 2020.
+          [25] Christopher C. Paige. A useful form of unitary matrix ob-      [37] Yaohung Tsai, Piotr Luszczek, and Jack Dongarra. Mixed-
+                tained from any sequence of unit 2-norm n-vectors. SIAM J.          precision algorithm for 昀椀nding selected eigenvalues and
+                Matrix Anal. Appl., 31(2):5653583, May 2009.                        eigenvectors of symmetric and Hermitian matrices.         In
+          [26] Christopher C. Paige. The effects of loss of orthogonality           ScalAH22: 13th Workshop on Latest Advances in Scalable
+                on large scale numerical computations.     In Osvaldo Ger-          Algorithms for Large-Scale Heterogeneous Systems, pages
+                vasi, Beniamino Murgante, Sanjay Misra, Elena Stankova,             1310, Dallas, Texas, USA, November 14, 2022.
+                Carmelo M. Torre, Ana Maria A.C. Rocha, David Taniar,         [38] T. Ogita and K. Aishima. Iterative re昀椀nement for singular
+                Bernady O. Apduhan, Eufemia Tarantino, and Yeonseung                valuedecompositionbasedonmatrixmultiplication. J.Com-
+                Ryu, editors, Computational Science and Its Applications 3          put. Appl. Math, 369:112512, 2020.
+                ICCSA2018,pages4293439,Cham,2018.SpringerInterna-
+                tional Publishing.                                            [39] YukiUchino,TakeshiTerao,andKatsuhisaOzaki. Accelera-
+                                                                                    tion of iterative re昀椀nement for singular value decomposition.
+          [27] Youcef Saad.    A 昀氀exible inner-outer preconditioned GM-            Numerical Algorithms, 95:97931009, 2024.
+                RES algorithm.    SIAM Journal on Scienti昀椀c Computing,
+                14(2):4613469, March 1993.                                    [40] H. Ootomo, Katsuhisa Ozaki, and Rio Yokota. DGEMM on
+                                                                                    integer matrix multiplication unit. The International Jour-
+          [28] S. Kudo, K. Nitadori, T. Ina, and T. Imamura. Implemen-              nal of High Performance Computing Applications, 2024. in
+                tation and numerical techniques for one E昀氀op/s HPL-AI              press.
+                benchmark on Fugaku. In ScalA20 Conf., SC20, 2020.            [41] Ichitaro Yamazaki, Christian Glusa, Jennifer Loe, Piotr
+          [29] Hao Lu, Michael Matheson, Vladyslav Oles, Austin Ellis,              Luszczek, Sivasankaran Rajamanickam, and Jack Dongarra.
+                Wayne Joubert, and Feiyi Wang. Climbing the summit and              High-performance GMRESmulti-precision benchmark: De-
+                pushing the frontier of mixed precision benchmarks at ex-           sign, performance, and challenges. In 2022 International
+                treme scale. In SC22: International Conference for High             Workshop on Performance Modeling, Benchmarking and
+                Performance Computing, Networking, Storage and Analysis,            SimulationofHighPerformanceComputerSystems(PMBS),
+                pages 1315, 2022.                                                   pages 1310, Dallas, Texas, USA, November 14, 2022.
+          [30] Massimiliano Fasi, Ncholas J. Higham, S. Pranesh, and          [42] Xiaoye S. Li and James W. Demmel. Making sparse Gaus-
+                M. Mikaitis. Numerical behavior of NVIDIA tensor cores.             sian elimination scalable by static pivoting. In SC ’98: Pro-
+                PeerJ Computer Science, 7(e330), 2021.                              ceedings of the 1998 ACM/IEEE Conference on Supercom-
+                                                                                    puting, pages 34334, San Jose, CA, USA, November 1998.
+          [31] James W. Demmel, Inderjit Dhillon, and Huan Ren. On the        [43] Standard for binary 昀氀oating point arithmetic, 1985.
+                correctness of some bisection-like parallel eigenvalue algo-
+                rithms in 昀氀oating point arithmetic. Electronic Transactions  [44] IEEE standard for 昀氀oating-point arithmetic, 2019. (Revision
+                onNumerical Analysis, 3:1163149, December 1995.                     of IEEE 754-2008) DOI:10.1109/IEEESTD.2019.8766229.
+          [32] M. Gu, J. Demmel, and I. Dhillon. Ef昀椀cient computation        [45] Piotr Luszczek, Jack Dongarra, and Jeremy Kepner.        De-
+                of the Singular Value Decomposition with applications to            sign and implementation of the HPCC benchmark suite. CT
+                least squares problems. Technical Report CS-94-257, De-             Watch Quarterly, 2(4A):18323, November 2006.
+                partmentofComputerScience,UniversityofTennessee,Oc-           [46] Jack Dongarra and Piotr Luszczek.      HPC Challenge: de-
+                tober 1994.                                                         sign, history, and implementation highlights. In Jefferey S.
+          [33] Piotr Luszczek, Anthony Castaldo, Yaohung M Tsai, Daniel             Vetter, editor, Contemporary High Performance Computing:
+                Mishler, and Jack Dongarra. Numerical eigen-spectrum slic-          FromPetascale Toward Exascale, volume 1 of CRC Compu-
+                ing, accurate orthogonal eigen-basis, and mixed-precision           tational Science Series, chapter 2, pages 13332. Taylor and
+                eigenvalue re昀椀nement using OpenMP data-dependent tasks             Francis, Boca Raton, 1 edition, 2013.
+                and accelerator of昀氀oad. The International Journal of High    [47] Jack Dongarra, Michael A. Heroux, and Piotr Luszczek. The
+                PerformanceComputingApplications,38(6):6713691,2024.                High-Performance Conjugate Gradients benchmark. SIAM
+          [34] Ichitaro Yamazaki, Stanimire Tomov, and Jack Dongarra.               News, 51(1):12312, January/February 2018.
+                Mixed-precision Cholesky QR factorization and its case        [48] Brian W. KernighanandDennisM.Ritchie. TheCProgram-
+                studies on multicore CPU with multiple GPUs. SIAM J. Sci.           ming Language. Prentice-Hall, Upper Saddle River, New
+                Comput., 37(3):C3073C330, 2015.                                     Jersey, 1978.
+                                                                            9
+          [49] Margaret A. Ellis and Bjarne Stroustrup.  The Annotated
+               C++ Reference Manual. Addison-Wesley, Reading, Mas-
+               sachusetts, 1990.
+          [50] Mark Hoemmen, Dasy Hollman, Christian Trott, Daniel
+               Sunderland, Nevin Liber, Alicia Klinvex, Li-Ta Lo, Damien
+               Lebrun-Grandie, Graham Lopez, Peter Caday, Sarah Knep-
+               per, Piotr Luszczek, and Timothy Costa.    P1673R12: a
+               free function linear algebra interface based on the BLAS.
+               ISO JTC21/SC22/WG21 Library Evolution Working Group,
+               pages 13141, March 14, 2023.
+          [51] PiotrLuszczek,YaohungTsai,NeilLindquist,HartwigAnzt,
+               and Jack Dongarra. Scalable data generation for evaluating
+               mixed-precision. In Proceedings of IEEE HPEC’20: High
+               Performance Extreme Computing, Waltham, MA, USA,
+               2020.
+          [52] Alan M. Turing. Rounding-off errors in matrix processes.
+               TheQuarterlyJournalofMechanicsandAppliedMathemat-
+               ics, 1(1):2873308, January 1948.
+          [53] G. Zielke.   Testmatrizen mit maximaler Konditionszahl.
+               Computing, 13(1):33354, March 1974.
+          [54] Massimiliano Fasi and Nicholas J. Higham. Matrices with
+               tunable in昀椀nity-norm condition number and no need for piv-
+               oting in lu factorization. SIAM Journal on Matrix Analysis
+               andApplications, 42(1):4173435, 2021.
+          [55] A. M. Ostrowski. On the spectrum of a one-parametric fam-
+               ily of matrices. J. Reine Angew. Math., 193(3/4):1433160,
+               1954.
+          [56] Alan Edelman. Eigenvalues and Condition Numbers of Ran-
+               domMatrices. PhD thesis, Massachusetts Institute of Tech-
+               nology, May 1989.
+          [57] NcholasJ.HighamandTheoMary. Anewapproachtoprob-
+               abilistic rounding error analysis. SIAM journal on Scienti昀椀c
+               Computing, 41(5):A28153A2835, 2019.
+          [58] Neil Lindquist, Piotr Luszczek, and Jack Dongarra. General-
+               izing RandomButter昀氀y Transforms to arbitrary matrix sizes.
+               ACMTrans.Math.Softw., 50(4), December 2024.
+                                                                       10

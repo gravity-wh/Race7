@@ -1,0 +1,1861 @@
+                                    Accelerating the Solution of Linear Systems by
+                                        Iterative Reﬁnement in Three Precisions
+                                              Carson, Erin and Higham, Nicholas J.
+                                                                     2017
+                                                       MIMS EPrint: 2017.24
+                                       Manchester Institute for Mathematical Sciences
+                                                       School of Mathematics
+                                                    The University of Manchester
+                                 Reports available from:   http://eprints.maths.manchester.ac.uk/
+                                     And by contacting:    The MIMS Secretary
+                                                           School of Mathematics
+                                                           The University of Manchester
+                                                           Manchester, M13 9PL, UK
+                                                                                                           ISSN 1749-9097
+                    ACCELERATINGTHESOLUTIONOFLINEARSYSTEMSBY
+                                                                                        ∗
+                          ITERATIVE REFINEMENT IN THREE PRECISIONS
+                                                  †                           ‡
+                                    ERIN CARSON AND NICHOLAS J. HIGHAM
+                    Abstract. We propose a general algorithm for solving a n×n nonsingular linear system Ax = b
+                based on iterative reﬁnement with three precisions. The working precision is combined with possibly
+                diﬀerent precisions for solving for the correction term and for computing the residuals. Via rounding
+                error analysis of the algorithm we derive suﬃcient conditions for convergence and bounds for the
+                attainable normwise forward error and normwise and componentwise backward errors. Our results
+                generalize and unify many existing rounding error analyses for iterative reﬁnement. With single
+                precision as the working precision, we show that by using LU factorization in IEEE half precision as
+                the solver and calculating the residuals in double precision it is possible to solve Ax = b to full single
+                                                             4            3
+                precision accuracy for condition numbers κ2(A) ≤ 10 , with the O(n ) part of the computations
+                carried out entirely in half precision. We show further that by solving the correction equations by
+                GMRESpreconditioned by the LU factors the restriction on the condition number can be weakened
+                            8
+                to κ (A) ≤ 10 , although in general there is no guarantee that GMRES will converge quickly. Taking
+                    2
+                for comparison a standard Ax = b solver that uses LU factorization in single precision, these results
+                suggest that on architectures for which half precision is eﬃciently implemented it will be possible to
+                solve certain linear systems Ax = b up to twice as fast and to greater accuracy. Analogous results
+                are given with double precision as the working precision.
+                    Key words. iterative reﬁnement, linear system, multiple precision, mixed precision, rounding
+                error analysis, backward error, forward error, GMRES, preconditioning
+                    AMSsubject classiﬁcations. 65G50, 65F10,
+                    1. Introduction. Iterative reﬁnement is a method for improving an approxi-
+                mate solution y to a linear system Ax = b by computing the residual r = b − Ay,
+                solving the correction equation Ad = r, forming the update y ← y + d, and repeat-
+                ing these steps as necessary. We consider a general iterative reﬁnement algorithm
+                that includes a variety of existing ones as special cases. The algorithm contains three
+                precisions:
+                      • u is the precision at which the data A,b and the solution x are stored (the
+                        working precision),
+                      • u is the precision at which the factorization of A is computed,
+                          f
+                      • u is the precision at which residuals are computed.
+                          r
+                The precisions are assumed to satisfy
+                (1.1)                              u ≤u≤u .
+                                                    r         f
+                The algorithm also contains a fourth precision:
+                      • u is the precision at which the correction equation is (eﬀectively) solved,
+                          s
+                        with u ≤ u ≤ u .
+                                   s    f
+                Whereas u, u , and u are intended to be possibly diﬀerent precisions supported by
+                             f       r
+                the computing environment (ideally the hardware), u is essentially a parameter that
+                                                                   s
+                   ∗Version of July 25, 2017. Funding: The work of the second author was supported by MathWorks
+                and by Engineering and Physical Sciences Research Council grant EP/P020720/1. The opinions and
+                views expressed in this publication are those of the authors, and not necessarily those of the funding
+                bodies.
+                   †Courant Institute of Mathematical Sciences, New York University, New York, NY, USA
+                (erinc@cims.nyu.edu, http://math.nyu.edu/˜erinc).
+                   ‡School of Mathematics, The University of Manchester, Manchester, M13 9PL, UK
+                (nick.higham@manchester.ac.uk, http://www.maths.manchester.ac.uk/˜higham).
+                                                         1
+                2                    ERIN CARSON AND NICHOLAS J. HIGHAM
+                describes how accurately the correction equation is solved; it will take the value u
+                                                                                                f
+                or u in the cases of interest. The precise meaning of u is explained below.
+                                                                    s
+                    Algorithm 1.1. Let the nonsingular matrix A ∈ Rn×n and b ∈ Rn be given
+                in precision u. This algorithm uses iterative reﬁnement to generate a sequence of
+                approximations xi, all stored in precision u, to the solution of Ax = b.
+                    1 Solve Ax =b in precision u and store x at precision u.
+                                0                 f            0
+                    2 for i = 0:∞
+                    3      Compute r =b−Ax at precision u and round r to precision u .
+                                     i         i              r            i             s
+                    4      Solve Ad = r at precision u and store d at precision u.
+                                   i    i             s           i
+                    5      x   =x +d at precision u.
+                            i+1    i   i
+                    6 end
+                    Note that a diﬀerent solver can be used on step 1 than on step 4. In practice,
+                these solvers will be related, so although the precision u does not appear in the loop,
+                                                                     f
+                information computed in step 1 at precision u will be used in step 4.
+                                                            f
+                    Algorithm 1.1 includes as special cases both old and more recent forms of iterative
+                reﬁnement, as we now explain.
+                    In traditional iterative reﬁnement the solver is LU factorization and residuals
+                are computed at twice the working precision, which corresponds to u    = u = u
+                                                                                     f     s
+                            2
+                and u = u . This form of iterative reﬁnement was programmed by Wilkinson in
+                      r
+                1948 [35] and used at that time by Wilkinson and his colleagues on desk calculating
+                machines and Hollerith punched card machines [13], [37]. It was in common use up
+                until the 1970s, owing to the fact that inner products could be cheaply accumulated
+                at twice the working precision on many computers of that era. Early error analyses
+                are given by Wilkinson for ﬁxed point arithmetic [36] and Moler [26] for ﬂoating point
+                arithmetic.
+                    In ﬁxed precision reﬁnement all computations are at the same precision: u  =
+                                                                                             f
+                u =u=u . This form of reﬁnement started to be considered in the 1970s and was
+                  s        r
+                analyzed by Jankowski and Wo´zniakowski [21] for a general solver and by Skeel [31]
+                for LU factorization. Higham [16] extended Skeel’s analysis to a general solver and
+                in [17] gave a further extension to allow for residuals computed in extra precision.
+                LAPACK[3] implements ﬁxed precision iterative reﬁnement.
+                    In the 2000s iterative reﬁnement attracted renewed interest because on modern
+                computer architectures single precision arithmetic is usually at least twice as fast as
+                double precision arithmetic. With the base precision u equal to double precision, u
+                                                                                                f
+                and u equal to single precision, u = u, and a solver based on LU factorization, the
+                      s                          r
+                mostexpensive part of the computation is done entirely in single precision. This usage
+                is proposed and analyzed by Langou et al. [23] and has been exploited extensively by
+                Dongarraandhiscoauthors; see [1, sec. 9] for a recent overview and further references.
+                    Error analyses of the methods above all require A to be safely bounded away
+                from singularity relative to the working precision. Carson and Higham [9] give a new
+                forward error analysis of iterative reﬁnement that identiﬁes a mechanism that allows
+                accurate solutions to be obtained to systems for which A has condition number as
+                large as the order of the reciprocal of the unit roundoﬀ. Their analysis requires the
+                update equation in line 4 of Algorithm 1.1 to be solved with relative error less than
+                1, and they achieve this by the use of GMRES preconditioned with the LU factors.
+                    Table 1.1 summarizes the main existing ﬂoating point error analyses. In the table
+                we categorize a forward error bound as componentwise if it employs the condition
+                numbers cond(A) or cond(A,x) deﬁned in (2.2) below and normwise if it only employs
+                κ(A) deﬁned in (2.1). A backward error analysis is classed as componentwise or
+                                       ITERATIVE REFINEMENT IN THREE PRECISIONS                                3
+                                                             Table 1.1
+                       Summaryofexistingroundingerror analyses for iterative reﬁnement in ﬂoating point arithmetic
+                   indicating (a) whether the analyses apply to LU factorization only or to an arbitrary solver, (b)
+                   whether the backward or forward error analyses are componentwise (“comp”) or normwise (“norm”),
+                   and (c) the assumptions on the precisions u , u , u, u in Algorithm 1.1 (u  = u and u = u
+                                                             f   s      r                    f           s     f
+                   unless otherwise stated).
+                                                                 Forward     Backward
+                                                 Year   Solver     error       error          Precisions
+                        Moler [26]               1967     LU      norm           –             u≥u
+                                                                                                     r
+                        Stewart [33]             1973     LU      norm           –             u≥u
+                                                                                                     r
+                        Jankowski et al. [21]    1977    arb.     norm         norm            u=u
+                                                                                                     r
+                        Skeel [31]               1980     LU      comp         comp            u≥u
+                                                                                                     r
+                        Higham [16]              1991    arb.     comp         comp            u=u
+                                                                                                     r
+                        Higham [17], [18]        1997    arb.     comp         comp            u≥u
+                                                                                                     r
+                        Tisseur [34]             2001    arb.     norm         norm            u≥u
+                                                                                                     r
+                        Langou et al. [23]       2006     LU      norm         norm          u ≥u=u
+                                                                                              f        r
+                        Carson and Higham [9]    2017    arb.     comp           –             u≥u
+                                                                                                     r
+                        This work                2017    arb.     comp      comp, norm    u ≥u ≥u≥u
+                                                                                           f     s        r
+                                                             Table 1.2
+                                          Parameters for four IEEE arithmetic precisions.
+                                       Type         Size      Range     Unit roundoﬀ u
+                                                                ±5        −11          −4
+                                       half         16 bits   10        2     ≈4.9×10
+                                                                ±38       −24          −8
+                                       single       32 bits   10        2     ≈6.0×10
+                                                                ±308      −53          −16
+                                       double       64 bits   10        2     ≈1.1×10
+                                                                ±4932     −113          −35
+                                       quadruple    128 bits  10        2      ≈9.6×10
+                   normwise according as it bounds the absolute value or the norm of the residual vector
+                   (we do not regard a componentwise analysis as implying a normwise one, as simply
+                   taking norms in a componentwise bound does not necessarily yield the strongest
+                   normwise result).
+                       Half precision (16 bit) ﬂoating point arithmetic, deﬁned as a storage format in
+                   the 2008 revision of the IEEE standard [20], is now starting to become available in
+                   hardware, for example in the NVIDIA P100 and V100 GPUs and the AMD Radeon
+                   Instinct MI25 GPU, on which it runs twice as fast as single precision arithmetic
+                   with a proportional saving in energy consumption. It is therefore now of interest
+                   to consider iterative reﬁnement with u        corresponding to half precision. Table 1.2
+                                                              f
+                   summarizes key parameters for four IEEE arithmetic precisions. Table 1.3 presents
+                   another view of iterative reﬁnement, from the point of view of diﬀerent ways in which
+                   it can be implemented in hardware-based IEEE arithmetic. We note that another
+                   context where low precision arithmetic is of interest is the hybrid iterative reﬁnement
+                   method of Douglas, Mandel, and Miranker [11], which solves the correction equation
+                   using low-precision analog circuitry and computes residuals using higher-precision
+                   digital circuitry and eﬀectively has u = u and u > u.
+                                                           r             f
+                       The goal of this work is to develop new iterative reﬁnement algorithms based on
+                   three precisions. We show that by using LU factorization in IEEE half precision as the
+                   solver, single precision for the working precision, and double precision for the compu-
+                   tation of the residuals, it is possible to solve Ax = b to full single precision accuracy
+                                                        4                3
+                   for condition numbers κ2(A) ≤ 10 , with the O(n ) part of the computations carried
+                   out entirely in half precision. We show further that by using GMRES preconditioned
+                   by the LU factors as the solver on step 4, the restriction on the condition number can
+                                                 8
+                   be weakened to κ (A) ≤ 10 . These results provide the ability to solve Ax = b at up
+                                      2
+                    4                         ERIN CARSON AND NICHOLAS J. HIGHAM
+                                                                 Table 1.3
+                         Diﬀerent scenarios for iterative reﬁnement in IEEE arithmetic. The columns represent diﬀerent
+                    choices for u , u, and u , where in the notation of Algorithm 1.1 the data is stored at precision
+                                 f           r
+                    u, the solves in steps 1 and 4 are carried out in precision u  =us, and residuals are computed at
+                                                                                 f
+                    precision u . The last column indicates whether any existing backward or forward error analysis is
+                               r
+                    applicable to this situation when LU factorization is used as the solver.
+                                                              Precision
+                              Usage          Half       Single              Double          Existing analysis?
+                              Traditional             data, solve          residual                 √
+                              Traditional                            data, solve, residual          √
+                              2000s                      solve          data, residual              √
+                              New           solve   data, residual                                  √
+                              New           solve        data              residual                 ×
+                              New           solve                       data, residual              √
+                    to twice the speed and the same accuracy as by traditional iterative reﬁnement with
+                    LUfactorization in single precision and double precision residuals.
+                         In order to understand the behavior of the new algorithms we provide a thorough
+                    rounding error analysis of Algorithm 1.1 in its full generality. In doing so, we
+                           • provide rigorous componentwise forward error bounds and both component-
+                              wise and normwise backward error bounds,
+                           • make minimal assumptions about the solvers used in steps 1 and 4, so that
+                              the analysis is applicable to all the situations mentioned above, as well as to
+                              others that can be envisaged,
+                           • treat the precisions u , u , u, and u as independent parameters.
+                                                       f    s           r
+                    Our results generalize and unify most existing analyses, including the recent forward
+                    error analysis of [9]. We make one omission: we do not try to prove a “one step
+                    of iterative reﬁnement in ﬁxed precision implies componentwise backward stability”
+                    result [16], [31], which is of lesser practical importance. However, such a result can
+                    be obtained by extending our analysis, under further assumptions on the solver.
+                         Iterative reﬁnement is often used as a way to restore stability when a factoriza-
+                    tion has been computed in a way that preserves structure and reduces cost at the
+                    expense of potential stability, as for example with sparse matrices [7], [38] or symmet-
+                    ric quasideﬁnite matrices [14]. Our analysis can be applied to these situations, since
+                    we make very general assumptions on the solver.
+                         Our attention is focused exclusively on iterative reﬁnement as described in Al-
+                    gorithm 1.1. We do not consider here recursive (also known as binary cascade, or
+                    k-fold) iterative reﬁnement, in which each solve on step 4 of the algorithm is carried
+                    out by a recursive application of iterative reﬁnement, possibly with increasing pre-
+                    cision [22], [32]. We also do not consider hybrid schemes, such as that in [8], that
+                    combine iterative reﬁnement with some other iterative method in such a way that the
+                    basic structure of the algorithm is changed.
+                         2. Preliminaries. We now summarize our notation and our assumptions on
+                    the solver. We will use the standard model of ﬂoating point arithmetic [18, sec. 2.2].
+                    Given an integer k, we deﬁne
+                                                           γ =ku/(1−ku).
+                                                             k
+                    Asuperscript on γ will denote that u carries that superscript as a subscript; thus, for
+                    example, γr = ku /(1−ku ).
+                                 k       r          r
+                                  ITERATIVE REFINEMENT IN THREE PRECISIONS                        5
+                     For a nonsingular matrix A and a vector x, we need the normwise condition
+                 number
+                                                          −1
+                 (2.1)                        κ (A)=kA k kAk
+                                               ∞              ∞     ∞
+                 and the componentwise condition numbers
+                                                                      k|A−1||A||x|k
+                 (2.2)       cond(A) = k|A−1||A|k ,      cond(A,x) =                ∞,
+                                                    ∞                      kxk∞
+                 where |A| = (|a |). These condition numbers measure the sensitivity of the solution
+                                ij
+                 of Ax = b to small normwise and componentwise perturbations, respectively [18,
+                 chap. 7].
+                     Inequalities between vectors or matrices are interpreted componentwise. We de-
+                 note by fl (·) the evaluation of the argument of fl in precision u .
+                           r                                      r              r
+                     Weassume that the solver used in step 4 of Algorithm 1.1 produces a computed
+                         b
+                 solution d to Ad = rb satisfying three conditions:
+                          i      i    i
+                                              b
+                 (2.3)                        d =(I+u E)d , u kE k <1,
+                                               i         s  i i     s  i ∞
+                                           b                   b
+                 (2.4)              krb −Ad k    ≤u (c kAk kd k +c krbk ),
+                                      i     i ∞     s  1    ∞ i ∞       2  i ∞
+                                              b          b
+                 (2.5)                 |rb − Ad | ≤ u G |d |,
+                                        i      i    s  i  i
+                 where E , c , c , and G are functions of n, A, rb , and u . The ﬁrst assumption simply
+                         i  1  2       i                      i       s
+                                                      b
+                 says that the normwise relative error kd −d k /kd k  is bounded by a multiple of u
+                                                       i   i ∞    i ∞                             s
+                 and is less than 1. The second assumption says that the normwise relative backward
+                        b
+                 error η(d ) is of order at most max(c ,c )u , where for an approximate solution y to
+                         i                           1 2   s
+                 Ax=b,η(y) is given by [18, Thm. 7.1], [30]
+                        η(y) := min{ : (A+∆A)y = b+∆b, k∆Ak ≤ kAk, k∆bk ≤ kbk}
+                             = kb−Ayk .
+                               kAkkyk+kbk
+                 The third condition will be needed in order to analyze the componentwise relative
+                 backward error, which for an approximate solution y to Ax = b is given by [18,
+                 Thm. 7.3], [29]
+                 (2.6)    ω(y) := min{ : (A+∆A)y = b+∆b, |∆A| ≤ |A|, |∆b| ≤ |b|}
+                 (2.7)         =max |b−Ay|i ,
+                                   i  (|A||y| + |b|)
+                                                  i
+                 where ξ/0 is interpreted as zero if ξ = 0 and inﬁnity otherwise. Table 2.1 summarizes
+                 the sizes of c , c , E , and G in (2.3)–(2.5) for the solvers that will be considered in
+                             1  2   i        i
+                 sections 7 and 8.
+                     We present the rounding error analysis of Algorithm 1.1 in the next three sec-
+                 tions, which provide forward error bounds, normwise backward error bounds, and
+                 componentwise bounds, respectively. The importance of scaling to avoid underﬂow
+                 and overﬂow when half precision is used is explained in section 6. In section 7 we
+                 specialize the results to the case where the solver is LU factorization and explain
+                 the numerical properties of iterative reﬁnement in three precisions: half, single, and
+                 double. In section 8 we use GMRES preconditioned by the LU factors as the solver
+                 6                    ERIN CARSON AND NICHOLAS J. HIGHAM
+                                                      Table 2.1
+                     Summary of the sizes of the quantities in assumptions (2.3)–(2.5) for solution of the correction
+                                                                                               2
+                 equation with LU factorization (section 7) and GMRES-IR (section 8). Note that f(n) = O(n ).
+                                             u kE k            u max(c ,c )       u kG k
+                                               s  i ∞           s      1  2        s  i ∞
+                                                                     b b
+                                                −1 b b             k|L||U|k∞         b b
+                        IR w/LU fact.   3nu k|A   ||L||U|k∞   3nu              3nu k|L||U|k∞
+                                            f                    f   kAk          f
+                          GMRES-IR      uf(n)(1+γfκ (A))2          O(u) ∞        O(ukAk )
+                                                  n ∞                                   ∞
+                 and show that the resulting algorithm is able to solve accurately a wider range of
+                 problems than algorithms whose solver is based on LU factorization. In section 9
+                 we compare some of our new forms of iterative reﬁnement with the single precision–
+                 double precision form proposed by by Langou et al. [23]. Numerical experiments are
+                 given in section 10 that test the predictions of the analysis. Conclusions are given in
+                 section 11.
+                     3. Forward error analysis. For our forward error analysis of Algorithm 1.1 we
+                 will need the following lemma, which we state for a general p-norm (1 ≤ p ≤ ∞).
+                     Lemma 3.1. Let w,z ∈ Rn. Then w = Cz for a matrix C ∈ Rn×n with kCk =
+                                                                                                p
+                 kwk /kzk .
+                     p    p
+                     Proof. Let g be the vector dual to z with respect to the p-norm, so that gTz = 1
+                 and kgk kzk = 1, where 1/p + 1/q = 1 [18, sec. 6.1]. Setting C = wgT, we have
+                         q   p
+                 Cz =w and kCk =kwk kgk =kwk /kzk .
+                                 p       p   q       p     p
+                     In the analysis we will need to bound the vector b−Axb = A(x−xb ) in terms of
+                                                                           i          i
+                 x−xb . We can write
+                      i
+                 (3.1)                  kA(x−xb )k     =µkAk kx−xbk ,
+                                                 i  ∞     i    ∞       i ∞
+                 where µi satisﬁes
+                                                 κ (A)−1 ≤µ ≤1.
+                                                  ∞           i
+                 Wealso have the componentwise bound
+                                              |A(x−xb )| ≤ |A||x−xb |.
+                                                      i             i
+                 Wecan capture both inequalities by writing
+                                         b −Axb = A(x−xb ) = C (x−xb ),
+                                                i          i      i     i
+                 where
+                 (3.2a)                    |C | ≤ |A|,
+                                              i
+                                                  kA(x−xb )k
+                 (3.2b)                 kC k    =          i  ∞ =µkAk ,
+                                           i ∞      kx−xb k         i    ∞
+                                                          i ∞
+                 the equalities following from Lemma 3.1 and (3.1). By using the matrices Ci we can
+                 derive a general result that can be expressed in terms of either componentwise or
+                 normwise condition numbers.
+                     Consider ﬁrst the computation of r . There are two stages. First, sb = fl (b −
+                                                        i                               i     r
+                 Axb ) = b − Axb +∆s is formed in precision u , so that
+                    i          i     i                        r
+                                              |∆s | ≤ γr(|b| + |A||xb |),
+                                                  i    p           i
+                                     ITERATIVE REFINEMENT IN THREE PRECISIONS                              7
+                  where p is the maximum number of nonzeros in any row of [A b] [18, sec. 3.5]; thus
+                  p = n + 1 for a dense matrix A and vector b. Second, the residual is rounded to
+                  precision u , so rb = fl (sb ) = sb + f , where |f | ≤ u |sb |. Hence
+                              s     i     s  i      i    i          i     s  i
+                  (3.3)      rb = b − Axb +∆r ,      |∆r | ≤ u |b − Axb | + (1 + u )γr(|b| + |A||xb |).
+                              i           i     i        i     s        i          s  p            i
+                  Werewrite the bound for ∆r as
+                                                 i
+                  (3.4)              |∆r | ≤ u |C ||x − xb | + (1 + u )γr(|b| + |A||xb |),
+                                         i     s   i       i          s  p           i
+                  where Ci satisﬁes (3.2).
+                      For step 4 of Algorithm 1.1 we have, by (2.3),
+                                        b     −1             −1
+                                        d −A rb =u E A rb             (u kE k     ≤1)
+                                         i        i     s i      i       s   i ∞
+                                                    =u EA−1(b−Axb +∆r )
+                                                        s i             i      i
+                                                    =u E(x−xb +A−1∆r ).
+                                                        s i       i          i
+                  Hence, using (3.4),
+                   b      −1                           −1                             r              
+                  |d −A rb|≤u |E | |x−xb |+|A | u |C ||x−xb |+(1+u )γ (|b|+|A||xb |)
+                    i         i     s  i        i            s  i       i          s  p            i
+                                                   −1                             r       −1
+                  (3.5)         ≤u |E |(I +u |A      ||C |)|x − xb | + u (1 + u )γ |E ||A   |(|b| + |A||xb |).
+                                    s  i       s        i        i     s       s  p   i                 i
+                      For step 5, using the variant [18, eq. (2.5)] of the rounding error model we have
+                                                      b
+                  (3.6)                 xb    =xb +d +∆x,            |∆x | ≤ u|xb   |.
+                                          i+1     i    i      i          i       i+1
+                  Hence, using (3.3),
+                                                       −1      b      −1
+                                         xb   =xb +A rb +d −A rb +∆x
+                                          i+1     i        i    i         i      i
+                                                       −1        b      −1
+                  (3.7)                       =x+A ∆r +(d −A rb)+∆x.
+                                                            i     i         i       i
+                  Therefore, by (3.4) and (3.5),
+                                              −1                          r   −1
+                            |xb   −x|≤u |A ||C ||x−xb |+(1+u )γ |A |(|b|+|A||xb |)
+                              i+1          s        i       i         s  p                  i
+                                         +u |E | I +u |A−1||C | |x−xb |
+                                             s   i       s        i        i
+                                         +u (1+u )γr|E ||A−1|(|b|+|A||xb |)+u|xb          |
+                                             s       s  p   i                i        i+1
+                                                            −1
+                                       =u (I+u |E |)|A ||C |+|E | |x−xb |
+                                           s        s  i          i      i        i
+                                         +(1+u )γr(I +u |E |)|A−1|(|b|+|A||xb |)+u|xb            |.
+                                                  s  p       s   i                  i        i+1
+                      Wesummarize the analysis in a theorem.
+                      Theorem 3.2. Let Algorithm 1.1 be applied to a linear system Ax = b, where
+                  A∈Rn×n is nonsingular, and assume the solver used on step 4 satisﬁes (2.3). For
+                  i ≥ 0 the computed iterate xb     satisﬁes
+                                                i+1
+                                                |x −xb    | ≤ F |x − xb | + f ,
+                                                       i+1     i       i    i
+                  where
+                                 F =u (I +u |E |)|A−1||C |+u |E |,
+                                   i    s       s  i          i     s  i
+                                  f =(1+u )γr(I +u |E |)|A−1|(|b|+|A||xb |)+u|xb            |
+                                   i          s  p       s  i                   i        i+1
+                    8                        ERIN CARSON AND NICHOLAS J. HIGHAM
+                    and
+                                                                             
+                    (3.8)          kF k    ≤2u min cond(A),κ (A)µ +u kE k ,
+                                      i ∞        s                  ∞       i      s   i ∞
+                                    kf k   ≤2(1+u )γrk|A−1||A|(|x|+|xb |)k             +ukxb     k .
+                                      i ∞              s  p                     i   ∞         i+1 ∞
+                        Wenote that both terms are needed in the expression min(cond(A),κ (A)µ ) in
+                                                                                                        ∞       i
+                    (3.8). When A is diagonal, for example, the ﬁrst term in the min is the smaller, since
+                    cond(A) = 1, whereas the second term is the smaller when cond(A) ≈ κ (A)  1
+                    and µ 1.                                                                            ∞
+                          i
+                        We can now state a result about the convergence and attainable accuracy of
+                    Algorithm 1.1.
+                        Corollary 3.3. Under the conditions of Theorem 3.2, as long as
+                                                                               
+                    (3.9)                  φ =2u min cond(A),κ (A)µ +u kE k
+                                            i      s                   ∞       i     s    i ∞
+                    is suﬃciently less than 1, the forward error is reduced on the ith iteration by a factor
+                    approximately φ until an iterate xb is produced for which
+                                      i
+                                                 kx−xbk
+                    (3.10)                                ∞ .4pu cond(A,x)+u.
+                                                    kxk              r
+                                                        ∞
+                        When u = u this result can be compared with two earlier results for general
+                                  s
+                    solvers. It is stronger than [17, Thms. 3.1, 3.2], [18, Thms. 12.1, 12.2] because of the
+                    presence of the term κ (A)µ , whose signiﬁcance we will explain in section 8. It is
+                                              ∞       i
+                    also stronger than [9, Thm. 2.1], which does not have the cond(A) term in (3.9).
+                        Note that φ in (3.9) depends only on u . This means that the rate of convergence
+                                      i                              s
+                    of iterative reﬁnement depends only on the eﬀective precision of the solves, and is not
+                    aﬀected by the precision at which the data is stored or the residual is computed. By
+                    contrast, the limiting precision (3.10) depends on u and u, but not on u .
+                                                                               r                        s
+                        Note also that the precision u used for the initial solve in step 1 does not appear
+                                                          f
+                    in Theorem 3.2 or Corollary 3.3. However, u             does aﬀect the accuracy of xb and
+                                                                          f                                    0
+                    hence the number of iterations required.
+                        4. Normwise backward error analysis. Now we turn our attention to the
+                    behavior of the normwise backward error.
+                        Multiplying (3.7) by A gives
+                                                                        b
+                    (4.1)                      Axb     −b=∆r +Ad −rb +A∆x.
+                                                   i+1           i       i    i         i
+                                           b
+                    Writing h = rb −Ad , by assumption (2.4) we have
+                               i    i       i
+                                                            b
+                                   kh k    ≤u (c kAk kd k +c krbk )
+                                      i ∞      s  1     ∞ i ∞         2   i ∞
+                                           ≤u (c kAk kA−1k (krbk +kh k )+c krbk ),
+                                               s  1     ∞         ∞ i ∞           i ∞       2   i ∞
+                    which, assuming c κ (A)u < 1, gives
+                                        1 ∞        s
+                                                               c κ (A)+c
+                                                 kh k    ≤u 1 ∞               2 krb k  .
+                                                    i ∞      s1−c κ (A)u           i ∞
+                                                                    1 ∞        s
+                                    ITERATIVE REFINEMENT IN THREE PRECISIONS                          9
+                 Hence, from (4.1), using (3.6) and two invocations of (3.3),
+                     kb−Axb     k   ≤u kb−Axb k +(1+u )γr(kbk +kAk kxb k )
+                             i+1 ∞      s        i ∞          s  p    ∞        ∞ i ∞
+                                            c κ (A)+c
+                                      +u 1 ∞             2 krb k + ukAk kxb    k
+                                          s1−c κ (A)u        i         ∞ i+1 ∞
+                                               1 ∞      s             
+                                                        c κ (A)+c
+                                    ≤u 1+(1+u ) 1 ∞                  2   kb−Axb k
+                                        s            s 1−c κ (A)u                i ∞
+                                                           1 ∞      s
+                                               u (c κ (A)+c )
+                                      + 1+ s 1 ∞               2   (1+u )γr(kbk     +kAk kxb k )
+                                                1−c κ (A)u               s  p     ∞        ∞ i ∞
+                                                     1 ∞      s
+                                      +ukAk kxb       k .
+                                              ∞ i+1 ∞
+                      Wesummarize our ﬁndings in the next two results.
+                      Theorem 4.1. Let Algorithm 1.1 be applied to a linear system Ax = b with a
+                 nonsingular matrix A ∈ Rn×n satisfying c κ (A)u < 1, and assume the solver used
+                                                            1 ∞      s
+                 on step 4 satisﬁes (2.4). Then for i ≥ 0 the computed iterate xb    satisﬁes
+                                                                                  i+1
+                                          kb−Axb     k   ≤αkb−Axbk +β,
+                                                  i+1 ∞      i        i ∞     i
+                 where
+                                        c κ (A)+c 
+                  α =u 1+(1+u ) 1 ∞                   2   ,
+                    i    s            s 1−c κ (A)u
+                                              1 ∞      s
+                             u (c κ (A)+c )
+                  β = 1+ s 1 ∞                2   (1+u )γr(kbk     +kAk kxb k )+ukAk kxb           k .
+                    i          1−c κ (A)u               s  p     ∞        ∞ i ∞            ∞ i+1 ∞
+                                    1 ∞      s
+                      Corollary 4.2. Under the conditions of Theorem 4.1, if φ = (c κ (A)+c )u
+                                                                                        1 ∞        2   s
+                 is suﬃciently less than 1 then the residual is reduced on each iteration by a factor
+                 approximately φ until
+                               kb−Axb k    .γr(kbk +kAk kxb          k )+ukAk kxb k .
+                                       i ∞     p    ∞        ∞ i−1 ∞             ∞ i ∞
+                      Under the conditions of the corollary, making the reasonable assumption that
+                 kxb   k   ≈kxb k   and using u ≤ u, we have, ultimately,
+                    i−1 ∞       i ∞             r
+                 (4.2)                  kb−Axb k     .pu(kbk +kAk kxb k ).
+                                                i ∞           ∞        ∞ i ∞
+                 In other words, η(xb ) . pu, that is, xb is a backward stable solution to the working
+                                     i                  i
+                 precision.
+                      Early error analyses of iterative reﬁnement did not consider the residual, because
+                 when the solver is LU factorization with partial pivoting the residual of the original
+                 computed solution is already small, assuming there is no large element growth in the
+                 factorization. Starting with the work of Jankowski and Wo´zniakowski [21], it was
+                 appreciated that iterative reﬁnement could cure instability in the solver, even in ﬁxed
+                 precision. Our analysis shows this clearly: instability in the solver is captured by
+                 large values of c and c in (2.4), but as long as (c κ (A) + c )u is suﬃciently less
+                                  1      2                           1 ∞         2  s
+                 than 1, Corollary 4.2 guarantees that iterative reﬁnement will yield a small backward
+                 error.
+                      Note that there is little or no beneﬁt to the componentwise backward error of
+                 computing residuals at extra precision, since α in Theorem 4.1 is independent of u
+                                                                 i                                     r
+                 and the limiting residual is no smaller when u < u.
+                                                                r
+                    10                        ERIN CARSON AND NICHOLAS J. HIGHAM
+                         5. Componentwise backward error analysis. We now determine conditions
+                    under which Algorithm 1.1 achieves a small componentwise relative backward error.
+                         From (3.6) we have
+                                                                                 b
+                    (5.1)                              |xb | ≤ (1 + u)|xb   | + |d |.
+                                                         i               i+1      i
+                    Using this inequality, along with assumption (2.5), (3.3), and (3.6) in (4.1), gives
+                                  |b − Axb    | ≤ u |b − Axb | + (1 + u )γr(1 + u)(|b| + |A||xb         |)
+                                           i+1      s         i           s   p                     i+1
+                                                         b
+                    (5.2)                         +Z |d |+u|A||xb         |,
+                                                       1  i           i+1
+                    where
+                    (5.3)                             Z =u G +(1+u )γr|A|.
+                                                       1      s  i          s   p
+                    From (2.5), using (3.3) and (5.1),
+                       b        −1                 b
+                      |d | ≤ |A    |(|rb | + u G |d |)
+                        i              i     s   i  i
+                                −1                                    r                          b 
+                           ≤|A | (1+u )|b−Axb |+(1+u )γ (|b|+|A||xb |)+u G |d |
+                                            s          i           s   p             i       s  i  i
+                                −1                                            r                         −1      b
+                           ≤|A | (1+u )|b−Axb |+(1+u )(1+u)γ (|b|+|A||xb                         |) +|A |Z |d |.
+                                            s          i           s           p             i+1               1   i
+                    Premultiplying by Z1 gives
+                        b           −1                                         r                          −1      b
+                    Z |d | ≤ Z |A      | (1+u )|b−Axb |+(1+u )(1+u)γ (|b|+|A||xb                 |) +Z |A      |Z |d |,
+                      1  i      1              s          i          s          p            i+1        1         1  i
+                    that is,
+                               −1       b           −1                                           r                   
+                    (I −Z |A      |)Z |d | ≤ Z |A      | (1+u )|b−Axb |+(1+u )(1+u)γ (|b|+|A||xb                    |) .
+                           1          1  i      1               s          i           s          p             i+1
+                                      b
+                    Solving for Z |d |, we obtain
+                                   1   i
+                                b               −1                                            r                   
+                    (5.4)   Z |d | ≤ M Z |A        | (1 + u )|b − Axb | + (1 + u )(1 + u)γ (|b| + |A||xb         |) ,
+                              1  i       1 1                s          i           s           p             i+1
+                    where
+                    (5.5)                               M1=(I−Z1|A−1|)−1,
+                    and if we assume that kZ |A−1|k             ≤1/2 then M exists, has nonnegative entries,
+                                                   1        ∞                   1
+                    and satisﬁes kM k        ≤2. Substituting (5.4) in (5.2) gives
+                                       1 ∞
+                       |b − Axb    | ≤  u I +(1+u )M Z |A−1||b−Axb |
+                                i+1       s            s    1 1                  i
+                                       +(1+u )(1+u)γr(I +M Z |A−1|)(|b|+|A||xb                     |) + u|A||xb    |.
+                                                 s           p         1 1                     i+1             i+1
+                         Weobtain the following result.
+                         Theorem 5.1. Let Algorithm 1.1 be applied to a linear system Ax = b with a
+                    nonsingular matrix A ∈ Rn×n and assume the solver used on step 4 satisﬁes (2.5).
+                    Assume also that
+                                                     −1                    r         −1
+                    (5.6)                  u kG |A |k +(1+u )γ cond(A )≤1/2
+                                            s    i        ∞            s   p
+                    for all i. Then for i ≥ 0 the computed iterate xb           satisﬁes
+                                                                           i+1
+                                                   |b − Axb     | ≤ W |b−Axb |+y ,
+                                                            i+1        i        i     i
+                                        ITERATIVE REFINEMENT IN THREE PRECISIONS                                 11
+                   where
+                            W =u I+(1+u )M Z |A−1|,
+                               i    s            s    1 1
+                             y =(1+u )(1+u)γr(I +M Z |A−1|)(|b|+|A||xb                    |) + u|A||xb    |,
+                               i          s          p         1 1                    i+1             i+1
+                   where Z1 and M1 are deﬁned in (5.3) and (5.5), respectively.
+                        To interpret the theorem, note ﬁrst that M = I +O(u ), so
+                                                                         1             s
+                                                 W .u I+ u G +γr|A||A−1|,
+                                                   i     s       s  i     p
+                   which implies
+                   (5.7)                 kWk .u +u kG|A−1|k +γrcond(A−1),
+                                            i ∞       s    s    i        ∞      p
+                   and so kW k        < 1 in view of (5.6). Note that we can expect G ≥ |A| in prac-
+                                i ∞                                                   −1         i
+                   tice, so the dominant term in this bound will be u kG |A              | k . We conclude that
+                                                                              s   i        ∞
+                   kWk 1ifthesolver is not too unstable and A is not too ill conditioned relative
+                       i ∞
+                   to precision u .
+                                   s
+                        In the limit the y term dominates, but it is not a scalar multiple of |A||xb         |+|b|.
+                                           i                                                              i+1
+                   This is not a problem if we wish to take norms and use this analysis to obtain a bound
+                   for the normwise backward error that exploits the more descriptive bound (2.5). In
+                   order to bound ω(xb       ) we need a simple lemma [17, Lem. 1.2].
+                                          i+1
+                        Lemma 5.2. For A ∈ Rn×n and x ∈ Rn we have
+                                                       |A||x| ≤ kAk ξ(x)|x|,
+                                                                     ∞
+                   where ξ(x) = max |x |/min |x |, with x denoting the jth component of x.
+                                        j   j      j   j          j
+                        Using the lemma we have
+                                     |y | . γr 1 + k(u G +γr|A|)|A−1|k 
+                                       i     p           s  i    p             ∞
+                                            ×ξ(|b|+|A||xb       |)(|b| + |A||xb  |) + u|A||xb    |.
+                                                            i+1               i+1            i+1
+                   Hence, ultimately, the componentwise relative backward error of xi+1 satisﬁes
+                                           r                −1          r         −1 
+                   (5.8)     ω(xb    ) . γ   1+u kG|A |k +γ cond(A ) ξ(|b|+|A||xb                       |) + u.
+                                  i+1      p       s    i        ∞      p                           i+1
+                   This bound will be of order u as long as the solver is not too unstable, A is not too
+                   ill conditioned, and ξ(|b|+|A||xb       |) is not too large. The latter condition essentially
+                                                       i+1
+                   requires the vector |b| + |A||x| to be not too badly scaled, which is a natural require-
+                   ment, because when |b| + |A||x| has a zero component the problem of computing a
+                   solution with a small componentwise relative backward error is ill posed; see [5], [18,
+                   p. 241].
+                        Table 5.1 summarizes the suﬃcient conditions for convergence and the bounds
+                   on the limiting forward error and backward errors derived in this section and the
+                   previous two sections.
+                        6. Scaling. Our analysis makes no assumptions on the ﬂoating point arithmetic
+                   other than that the three precisions obey the standard model and satisfy (1.1). As
+                   is usual in rounding error analyses we have ignored the possibility of underﬂow and
+                   overﬂow. In general, this is reasonable, but if we take u              to be a low precision,
+                                                                                       f
+                   speciﬁcally if u     is IEEE half precision, then underﬂow or overﬂow is quite likely
+                                     f
+                   in step 4 of Algorithm 1.1, since the range of half precision numbers is only 10±5.
+                   12                      ERIN CARSON AND NICHOLAS J. HIGHAM
+                                                            Table 5.1
+                       Summary of the results of sections 3–5: conditions for convergence and the limiting size of the
+                   forward error, normwise backward error, and componentwise backward error.
+                                       Error   Convergence condition       Bound on limiting value
+                                     Forward   2u min(cond(A),κ (A)µ ) 4pu cond(A,x)+u
+                                                  s              ∞      i      r
+                                                +u kE k    <1
+                          Normwise backward        s   i ∞
+                                               (c κ (A)+c )u <1            pu
+                    Componentwise backward       1 ∞ −1 2 s                 r             −1        r       −1
+                                               u kG |A    | k  +(1+u )     γ (1+u kG |A     |k   +γ cond(A ))
+                                                 s   i      ∞         s     p      s   i      ∞     p
+                                               ×γrcond(A−1)≤1/2             ×ξ(|b|+|A||x|)+u
+                                                   p
+                   In this case it is important to incorporate scaling in step 4.         When the solver is
+                   LU factorization we can use any scheme for avoiding overﬂow in solving triangular
+                   systems. One such scheme is implemented in the LAPACK subroutine xLATRS, which
+                   performsscaling based on a coarse bound on the solution size to reliably avoid overﬂow
+                   [4], [10]. Here we propose a simple scaling that can be used with any solver, though
+                   it may not be optimal for any given solver. We replace steps 4 and 5 of Algorithm 1.1
+                   by
+                       4 θ =kr k , re = r /θ. Solve Ad = re at precision u and store d at
+                                  i ∞   i     i              i    i                s             i
+                           precision u.
+                       5 x      =x +θd at precision u.
+                            i+1     i      i
+                                                                            −1
+                   Since kre k   = 1, we have 1/kAk        ≤ kd k     ≤ kA k , so this scaling avoids the
+                            i ∞                         ∞       i ∞             ∞
+                   largest element of d overﬂowing or underﬂowingaslongas1/kAk             doesnotunderﬂow
+                           −1          i                                                 ∞
+                   and kA    k∞ does not overﬂow.
+                       7. Iterative reﬁnement with LU factorization. We now explore the conse-
+                   quences of the results of our error analysis for the standard form of iterative reﬁnement
+                   based on LU factorization. We recover known results and, in subsection 7.3, obtain
+                   new results for iterative reﬁnement in three precisions.
+                       Supposethatthesolveonstep1ofAlgorithm1.1iscarriedoutbyLUfactorization
+                   with an appropriate form of pivoting and that the solves on step 4 are done with the
+                   LU factors. Throughout this section we take u = u . For notational simplicity we
+                                                                       s     f
+                   assume that any necessary row or column interchanges have been applied to A before
+                   the factorization starts, so that the factorization is A = LU.
+                       Standard backward error analysis shows that the solution to Ay = c computed at
+                   precision u satisﬁes
+                               f
+                                                                            f  b b
+                   (7.1)                     (A+∆A)yb=c, |∆A|≤γ |L||U|,
+                                                                           3n
+                          b        b
+                   where L and U are the computed LU factors [18, Thm. 9.4]. Hence we can take
+                                     −1 b b
+                   u |E | ≈ 3nu |A      ||L||U| in (2.3). Since, from [18, Thm. 9.3] it follows that |A| ≤
+                    s   i        f
+                         f  b b
+                   (1+γ )|L||U|, the E term in (3.9) will dominate, and so in Corollary 3.3 we can take
+                         n               i
+                                                           −1 b b
+                   (7.2)               φ≡φ =3nu k|A ||L||U|k &3nu cond(A).
+                                             i       f                ∞         f
+                   Using [18, Lem. 9.6] it is possible to obtain a bound of the form φ ≤ f(n)ρ u κ (A),
+                                                                                                   n f ∞
+                   where f is a cubic polynomial and ρn is the growth factor for the LU factorization.
+                       In order to be sure that iterative reﬁnement converges, and does so at a rea-
+                   sonable rate, we need φ  1 and this is assured if A is not too ill conditioned and
+                   the factorization is not too unstable with respect to the precision u         at which the
+                                                                                               f
+                   factorization and substitutions are carried out.
+                       Wenowconsider three diﬀerent scenarios for the three precisions u , u, and u .
+                                                                                                 f           r
+                                  ITERATIVE REFINEMENT IN THREE PRECISIONS                     13
+                    7.1. Traditional reﬁnement with residuals in extra precision. Consider
+                                                   2
+                the case where u = u and u = u , which corresponds to traditional iterative re-
+                                 f           r
+                ﬁnement with residuals calculated at twice the working precision. Here, the limiting
+                accuracy is, from (3.10),
+                                 2                                        4     
+                (7.3)         4pu cond(A,x)+u≤4pucond(A)·u+u≤ 3φ+1 u,
+                so as long as φ in (7.2) is suﬃciently less than 1 we are assured of achieving a solution
+                with normwise relative error of order u. We therefore recover a stronger version of
+                the well known result ﬁrst obtained by Moler [26], with cond(A) in place of κ∞(A) in
+                the convergence condition.
+                    7.2. Fixed precision reﬁnement. With u = u and u = u we have ﬁxed pre-
+                                                               f          r
+                cision iterative reﬁnement, and φ is unchanged from the previous case. The diﬀerence
+                is that the limiting accuracy is now
+                (7.4)                  4pucond(A,x)+u≈4pucond(A,x).
+                Normwise and componentwise backward stability are shown by (4.2) and (5.8), under
+                the conditions stated there. As originally shown by Skeel [31], the beneﬁt of ﬁxed
+                precision iterative reﬁnement for the forward error is that it gives a limiting accuracy
+                of order cond(A,x)u instead of order κ (A)u for the original computed solution, and
+                                                     ∞
+                this is irrespective of any instability in the factorization as long as φ  1 continues
+                to hold.
+                    7.3. Mixed precision reﬁnement with lower precision solves. The third
+                scenario of interest is where we compute the LU factorization and carry out the
+                substitutions at less than the working precision. We consider four particular cases,
+                all of which yield new results. We show the relevant choices of IEEE precisions, in
+                the form “(u , u, u ).”
+                            f      r
+                                        2
+                    Case 1: u = u = u (half, single, single) or (single, double, double). This form
+                                   r    f
+                of reﬁnement has been analyzed and exploited by Langou et al. [23], and is also used
+                by Arioli and Duﬀ [6] and, for symmetric systems, by Hogg and Scott [19]. From
+                (7.2), convergence is assured if
+                                                    −1 b b       1/2
+                (7.5)                    φ=3nk|A ||L||U|k u         <1,
+                                                              ∞
+                and assuming this condition holds the limiting accuracy is, from (3.10) and (7.5),
+                                                 1/2     1/2           4   1/2  4 1/2
+                           4pucond(A,x)+u≤u         · 4pu   cond(A) . 3φu     < 3u    ,
+                which is stronger than the limiting accuracy proportional to κ (A)u obtained in
+                                                                              ∞
+                [23]. Compared with ﬁxed precision reﬁnement we have a more stringent convergence
+                                                                              3
+                requirement and the same limiting accuracy, but now the O(n ) ﬂops part of the
+                                                  1/2
+                computation is done at precision u   , which is a signiﬁcant computational saving.
+                The normwise and componentwise backward errors both reach order u under the
+                assumptions that A is not too ill conditioned or the factorization too unstable with
+                                     1/2
+                respect to precision u , and also that |A||x|+|b| is not too badly scaled in the case
+                of the componentwise backward error.
+                                   2       2
+                    Case 2: u = u , u = u (half, single, double) or (single, double, quad). Now we
+                              r            f
+                have three precisions in play—a case for which there is no existing analysis. Conver-
+                gence is again assured if (7.5) holds, and if it does we now achieve a normwise relative
+                error of order
+                            2                  3/2               1/2       4 3/2
+                        4pu cond(A,x)+u≤u         · 4pcond(A,x)u     +u.3u +u≈u.
+                 14                    ERIN CARSON AND NICHOLAS J. HIGHAM
+                                                        Table 7.1
+                     Diﬀerent choices of IEEE standard precision for Algorithm 1.1 with LU factorization (assumed
+                 numerically stable) as the solver (and with u = u ). The fourth column shows a bound on κ (A)
+                                                        s    f                                    ∞
+                 that must hold for the analysis to guarantee convergence (under suitable conditions described in the
+                 text) with limiting backward or forward errors of the orders shown in the ﬁnal three columns.
+                                                             Backward error
+                          u        u       u     κ (A)    normwise   comp’wise    Forward error
+                           f                r     ∞
+                                                     4                                       −8
+                          half   single  single    10       single     single    cond(A,x)·10
+                                                     4
+                         half    single  double    10       single     single         single
+                                                     4                                       −16
+                         half   double   double    10      double     double    cond(A,x)·10
+                                                     4
+                         half   double    quad     10      double     double         double
+                                                     8                                       −8
+                         single  single  single    10       single     single    cond(A,x)·10
+                                                     8
+                        single   single  double    10       single     single         single
+                                                     8                                       −16
+                        single  double   double    10      double     double    cond(A,x)·10
+                                                     8
+                        single  double    quad     10      double     double         double
+                 Nowweachieve full accuracy at precision u, albeit still only for problems with κ∞(A)
+                                  −1/2
+                 no larger than u     . Nevertheless, this is a signiﬁcant gain over case 1 in return for
+                                                          2
+                 a few residuals computed at precision u . The limiting backward errors are of order
+                 u, as in the previous case.
+                                          4
+                     Case 3: u = u = u (half, double, double). In this more extreme case the fac-
+                                     r    f
+                 torization is done at one quarter of the working precision. The convergence condition
+                                          −1 b b        1/4
+                 is, from (7.2), φ = 3nk|A   ||L||U|k u     <1,andthelimitingaccuracy is now, from
+                 (3.10),                             ∞
+                                                 3/4     1/4                4   3/4        3/4
+                         4pucond(A,x)+u≤u           · 4pu   cond(A)+u≤ 3φu         +u.u .
+                 Again, the limiting backward errors are of order u.
+                                     4          2
+                     Case 4: u = u , u = u (half, double, quad). In this most extreme case the
+                                     f    r
+                 convergence condition is the same as in case 3, and the limiting accuracy is now
+                     2
+                 4pu cond(A,x)+u.u. Again, the limiting backward errors are of order u.
+                     Take u to be half precision. Case 2 shows that for a suﬃciently well conditioned
+                            f
+                 linear system Ax = b with single precision data we can obtain the solution correct to
+                 single precision accuracy by doing only O(n2) operations in single or double precision
+                 with the dominant O(n3) part of the work at half precision. Case 3 shows that for
+                 double precision data the convergence condition is the same but the limiting accu-
+                 racy is of order cond(A,x)u, and the computational saving over working entirely at
+                 precision u is even greater. In case 4 the limiting accuracy improves to u.
+                     The statements about cost in this subsection assume that the number of required
+                 iterations is small and independent of n, which will be the case as long as φ in
+                 Corollary 3.3 is suﬃciently less than 1.
+                     Wesummarize the usages described in this section in Table 7.1.
+                     8. Mixed precision reﬁnement with preconditioned GMRES. Carson
+                 and Higham [9] introduce a new form of iterative reﬁnement that corresponds to
+                                                         2
+                 Algorithm 1.1 with u = u and u = u and a special way of solving the correction
+                                       f            r
+                 equation on line 4. The algorithm is intended to handle the situation where A is
+                 extremely ill conditioned, possibly even singular to working precision, so that κ∞(A)
+                                −1                                        bb
+                 could exceed u    . It computes an LU factorization A ≈ LU then solves the equation
+                 Ad=rbon step 4 by applying GMRES to the system
+                                             e     b−1b−1        b−1b−1
+                 (8.1)                       Ad≡U L Ad=U L rb,
+                                   ITERATIVE REFINEMENT IN THREE PRECISIONS                        15
+                 with all computations done at precision u except that the matrix–vector products
+                       e                                                 2
+                 with A needed by GMRES are evaluated at precision u . Carson and Higham give
+                 an error analysis similar to that in section 3 (but with u  = u = u), making the
+                                                                           f      s
+                 key observation that µi in (3.1) is typically much less than 1 in the early stages of
+                 iterative reﬁnement.
+                     Wenowconsider a more general GMRES-based algorithm involving three preci-
+                 sions rather than two. This is a special case of Algorithm 1.1 and we write it out in
+                 detail for clarity.
+                                                                                      n×n           n
+                     Algorithm8.1(GMRES-IR).Letthenonsingular matrix A ∈ R                and b ∈ R
+                 be given in precision u. This algorithm uses GMRES-based iterative reﬁnement using
+                 LU factors as preconditioners to generate a sequence of approximations xi, all stored
+                 in precision u, to the solution of Ax = b.
+                     1 Compute an LU factorization A = LU in precision u .
+                                                                             f
+                     2 Solve Ax =b in precision u using the LU factors and store x at precision u.
+                                 0                  f                                  0
+                     3 for i = 0:∞
+                     4      Compute r =b−Ax at precision u and round r to precision u.
+                                       i         i              r             i
+                                  e      b−1b−1         b−1b−1
+                     5      Solve Ad ≡ U     L Ad =U L r byGMRESatprecision u, with
+                                     i             i             i
+                                                          e
+                            matrix–vector products with A computed at precision u , and
+                                                                                    r
+                            store di at precision u.
+                     6      x    =x +d at precision u.
+                             i+1    i    i
+                     7 end
+                                                                   2
+                     The analysis in [9, sec. 3] shows that if u = u we can take in (2.3)
+                                                              r
+                                                                     e
+                 (8.2)                         u kEk    ≡uf(n)κ (A),
+                                                s    ∞           ∞
+                 where f is a quadratic polynomial and
+                                    e           f    −1 b b      2         f        2
+                 (8.3)          κ (A)≤ 1+γ k|A ||L||U|k             .(1+γ κ (A)) ,
+                                 ∞              n              ∞            n ∞
+                 these inequalities being pessimistic.
+                     The reason for including the fourth precision u in Algorithm 1.1 is now clear:
+                                                                     s
+                 even though the LU factors in step 1 of Algorithm 8.1 are computed at precision u ,
+                                                                                                    f
+                 the solve in step 5 that uses these factors achieves an error of order u = u. That the
+                                                                                      s
+                 LUfactors were computed at precision u is irrelevant to the preconditioned system,
+                                                          f
+                                               bb
+                 as long as the preconditioner LU remains nonsingular. All that matters is that the
+                                  e
+                 factors yield an A with condition number much smaller than that of A.
+                     The convergence condition φi  1 from the forward error analysis, where φi is
+                 deﬁned in (3.9), therefore holds if
+                                                                 f       2
+                 (8.4)                 2uκ (A)µ +f(n)u(1+γ κ (A)) 1.
+                                          ∞      i              n ∞
+                 As mentioned above, and explained in detail in [9], µi is much less than 1 in the early
+                 iterations, so this condition is in practice dominated by the second term, for which
+                                  f 2       2                                       −1/2 −1
+                 we need f(n)u(γ ) κ (A)  1, and hence certainly κ (A) < u             u ; so (8.4)
+                                  n   ∞              −1                   ∞               f
+                 can hold for κ∞(A) greater then u     . Then the limiting accuracy is, from (3.10),
+                                                     f
+                                                                  2
+                 4pu cond(A,x) + u. With u = u and u = u this reproduces the results of [9],
+                     r                        f             r
+                 giving a limiting accuracy of
+                                                 2
+                 (8.5)                        4pu cond(A,x)+u.4pu,
+                 provided cond(A,x)u ≤ 1.
+                  16                     ERIN CARSON AND NICHOLAS J. HIGHAM
+                                                          Table 8.1
+                      Diﬀerent choices of IEEE precision for Algorithm 8.1 The middle column shows a bound on
+                  κ (A)thatmustholdfortheanalysistoguarantee convergence with the limiting backward or forward
+                   ∞
+                  errors shown in the ﬁnal three columns.
+                                                                 Backward error
+                            u        u       u       κ (A)    normwise   comp’wise   Forward error
+                             f                 r      ∞
+                                                        4
+                            half    half    single    10        half        half         half
+                                                        8
+                            half   single   double    10        single     single        single
+                                                        12 ∗
+                            half   double   quad      10       double      double       double
+                                                        8
+                           single  single   double    10        single     single        single
+                                                        16
+                           single  double   quad      10       double      double       double
+                      * This bound is from the forward error analysis. The backward error analysis requires only
+                             16
+                  κ (A)≤10 .
+                   ∞
+                                          1/2            2
+                      Now we set u = u        and u =u . Provided that
+                                    f               r
+                                                                    1/2       2
+                  (8.6)                2uκ (A)µ +f(n)u 1+nu            κ (A)     1,
+                                           ∞      i                     ∞
+                                                                                    −1
+                  which, given the behavior of µ , essentially requires κ  (A) u ,Algorithm8.1 will
+                                                 i                       ∞
+                  converge and achieve a limiting accuracy of (8.5). To be speciﬁc, this means that by
+                  taking u to be IEEE half precision, u single precision, and u double precision, we
+                           f                                                       r
+                                                                                    −1
+                  can potentially solve systems with κ∞(A) possibly as large as u       to single precision
+                  accuracy while performing the LU factorization at half precision, so that only O(n2)
+                  of the ﬂops are at single or double precision. We can go even further, by setting
+                         1/4            2                                                −3/4
+                  u =u       and u =u . Now (8.4) implies the condition κ (A)  u              and gives a
+                   f               r                                           ∞
+                  limiting accuracy of (8.5) again.
+                      In order to achieve this potential we need the number of iterative reﬁnement
+                  steps (outer iterations) and the number of iterations in the GMRES solves (inner
+                  iterations), each of which involves a matrix–vector product and two triangular solves
+                  in precision u , to be small. If GMRES takes O(n) iterations to converge, each solve
+                                r
+                  will require O(n3) operations in precision u , and so any potential savings from using
+                                                               r
+                                                                                         e
+                  a lower precision LU factorization will be lost. In the case of normal A, the theoretical
+                                                                                                 e
+                  convergence rate of GMRES is completely determined by the spectrum of A. While
+                               e
+                  a small κ (A) often corresponds to fast GMRES convergence, this is not always the
+                           ∞
+                  case. For example, a cluster of eigenvalues close to the origin can cause stagnation of
+                  the GMRESresidual until the nth iteration, regardless of the condition number of the
+                  matrix [24]. Since the GMRES convergence rate for normal A is well understood, this
+                  suggests potential strategies for improving the convergence rate in the event that a
+                  lower precision LU factorization causes slow GMRES convergence. We brieﬂy discuss
+                  such strategies at the end of Section 10.
+                      For nonnormal matrices, however, the convergence rate of GMRES is still not
+                                                            e
+                  well understood, and the spectrum of A is irrelevant to the rate of GMRES con-
+                  vergence [15]. Nevertheless, our numerical experiments in Section 10.2.2 show that
+                  GMRES-IR in three precisions can be eﬃcient even for ill-conditioned nonnormal
+                  matrices in some cases.
+                      Wealso need to check the behavior of the residual for Algorithm 8.1. It is shown
+                                                         e      b−1b−1
+                  in [9] that the preconditioned system Ad = U      L r,issolved with backward error
+                                                            i             i
+                  of order u, and it is easy to show that this implies that the same is true of the original
+                  correction equation Ad = r , so that we can take c and c in (2.4) to be of order
+                                          i     i                        1       2
+                  1 and G to have norm of order kAk         in (2.5). It follows from Corollary 4.2 that
+                           i                             ∞
+                                 ITERATIVE REFINEMENT IN THREE PRECISIONS                    17
+                a normwise backward error of order u will be obtained if κ∞(A)u is suﬃciently less
+                than 1. Similarly, the analysis of section 5 shows that a componentwise backward
+                error of order u will be obtained if cond(A)u is suﬃciently less than 1, under the
+                usual assumptions on the problem. In the case where u = u, both these conditions
+                                                                     f
+                are much stricter than the condition (8.4) required for our forward error result—
+                essentially because the backward error analysis is not able to exploit the behavior of
+                the µi that is so favorable to the forward error analysis.
+                    In Table 8.1 we summarize the practical usages of Algorithm 8.1 with IEEE
+                arithmetic. The fourth line in the table corresponds to the algorithm proposed in [9].
+                The second line in the table summarizes our ﬁnding that the LU factorization can
+                be computed in half precision instead of single precision and the algorithm will still
+                obtain a result correct to single precision for κ∞(A) up to 108—in other words, we
+                can obtain as good a result at potentially half the cost.
+                    Finally, we note that when u  is half precision we could encounter overﬂow in
+                                                f
+                computing x0 on step 2, even if we scale as described in section 6. In this case we
+                can simply set x0 = 0. All our analysis is still valid, and when iterative reﬁnement
+                is rapidly converging this may have little eﬀect on the number of iterations. As we
+                mention in Section 10, we encounter this situation for one problem in our numerical
+                experiments, when (u ,u,u ) = (half,single,quad) and κ (A) > 1012.
+                                    f     r                           ∞
+                    9. Comparison with single–double implementations. Dongarra and his
+                co-authors have made extensive use over the last decade of iterative reﬁnement with
+                double precision as the working precision and LU factorization computed in single
+                precision as the solver, motivated by the fact that single precision arithmetic runs
+                twice as fast as double precision arithmetic on modern architectures [1, sec. 9], [23].
+                Code implementing this form of reﬁnement is available in the PLASMA library as
+                routine gesv [2]. Table 9.1 shows how our new forms of iterative reﬁnement compare
+                with this approach. We see that:
+                      • By changing to computing residuals in quadruple precision we can guarantee
+                        a forward error of order u (that is, the cond(A,x) factor is removed).
+                      • By reducing the precision of the LU factorization from single to half there
+                        is no loss in forward error or backward error, but the bound on κ (A) for
+                        convergence to be guaranteed drops from 108 to 104.            ∞
+                      • By switching to GMRES-IR and using quadruple precision residuals we can
+                        solve a larger class of problems (κ∞(A) bounded by 1016, or 1012 for the
+                        forward error bounds to hold when u is half precision) and are guaranteed
+                                                           f
+                        a forward error of order u.
+                    10. Numerical experiments. We have implemented Algorithms 1.1 and 8.1,
+                with the scaling of section 6, in MATLAB version R2015b, using the built-in single
+                and double precision arithmetics along with the fp16 half-precision class written by
+                Moler [25], [27].
+                    In all the tests in this section we use dense matrices of order n = 100 generated
+                by the built-in MATLAB function gallery(’randsvd’,kappa,mode) with speciﬁed
+                2-norm condition number kappa. Unless otherwise speciﬁed, we use the default mode
+                3, which generates a random matrix with geometrically distributed singular values.
+                The right-hand sides b are generated as MATLAB randn vectors. For reproducibility,
+                we issue the MATLAB function call rng(1) to set the random number generator seed
+                before generating each problem A,b. We use the MATLABlufunctiontocomputethe
+                LUfactorization with partial pivoting. For quadruple precision, we use the Advanpix
+                 18                    ERIN CARSON AND NICHOLAS J. HIGHAM
+                                                        Table 9.1
+                     Comparison of results for iterative reﬁnement using the solvers given in the ﬁrst column. The
+                 ﬁrst row corresponds to the usage of Dongarra and his co-authors.
+                                                                    Backward error
+                                 u       u       u      κ (A)    normwise   comp’wise    Forward error
+                                  f               r      ∞
+                                                            8                                       −16
+                          LU   single  double  double     10      double     double    cond(A,x)·10
+                                                            8
+                          LU   single  double   quad      10      double     double         double
+                                                            4                                       −16
+                          LU    half   double  double     10      double     double    cond(A,x)·10
+                                                            4
+                          LU    half   double   quad      10      double     double         double
+                                                           16
+                   GMRES-IR    single  double   quad     10       double     double         double
+                                                           12 ∗
+                   GMRES-IR     half   double   quad     10       double     double         double
+                     * This bound is from the forward error analysis. The backward error analysis requires only
+                            16
+                 κ (A)≤10 .
+                  ∞
+                 Multiprecision Computing Toolbox [28] with the setting mp.Digits(34), which is
+                 compliant with the IEEE 754-2008 standard [20].
+                     In each ﬁgure in this section, plots on the left show the behavior of the forward
+                 error ferr (red), normwise relative backward error nbe (blue), and componentwise
+                 relative backward error cbe (green). The dotted black line shows the value of the
+                 working precision u. Corresponding plots on the right show bounds on the sizes of
+                 the quantities in φi in the condition (3.9) for convergence of the forward error. Here
+                 we plot 2u κ (A)µ (cyan), 2u cond(A) (orange), and u kE k            (magenta). The
+                            s ∞       i           s                          s   i ∞
+                 quantity φi (which is the minimum of the cyan and orange values plus the magenta
+                 value) is plotted in black. The dotted black line marks 1. The x-axes are chosen to
+                 enable easy comparison between plots for diﬀerent choices of u , u, and u .
+                                                                                 f          r
+                     In describing the choice of precisions we will use notation of the form (u ,u,u ) =
+                                                                                             f    r
+                 (half,double,quad), which means that u , u, and u take the values corresponding to
+                                                          f          r
+                 IEEE half, double, and quadruple precisions, respectively.
+                     WebeginwithanexperimentthatdemonstratesthepotentialbeneﬁtsofGMRES-
+                 IR(Algorithm8.1). Theworkingprecisionisdoubleprecision. Wegeneratethematrix
+                 Ausing gallery(’randsvd’,1e9,2). For this matrix, κ∞(A) = 2.0e+10, and for the
+                 linear system Ax = b with the randomly generated b vector, cond(A,x) = 5.2e+09. In
+                 Figure 10.1 we show convergence results for iterative reﬁnement with LU factorization
+                 using (u ,u ) = (single,double) on the ﬁrst row, (single,quad) on the second row, and
+                         f   r
+                 (double,quad) on the third row. The fourth row of plots shows results using GMRES-
+                 IR with (u ,u ) = (single,quad). Above the plots in the last row, we show ‘GMRES
+                            f   r
+                 its’, which is a list in which the ith element is the number of iterations that GMRES
+                 took to converge in reﬁnement step i (using the convergence criterion that the relative
+                                                                      −4
+                 GMRES residual 2-norm is less than or equal to 10       ). From the ﬁrst row, we see
+                 that this system is too ill conditioned to be solved using iterative reﬁnement with a
+                 single precision LU factorization; neither the forward error nor the backward errors
+                 converge. From the second row, we see that as expected, computing the residuals
+                 more precisely has no eﬀect on convergence. The only way to improve convergence
+                 using standard iterative reﬁnement is to use higher precision in the LU factorization;
+                 we see from the third row that with a double precision LU factorization this results
+                 in fast convergence. The fourth row of plots shows the potential gains from using
+                 GMRES-IR. Here, even though the LU factors are computed in single precision, the
+                 forward errors and backward errors all reach the level of the working precision after
+                 two reﬁnement steps, which incur only ﬁve GMRES iterations in total.
+                                  ITERATIVE REFINEMENT IN THREE PRECISIONS                       19
+                     WenowinvestigatethebehaviorofbothiterativereﬁnementwithLUfactorization
+                 and GMRES-IR (Algorithms 1.1 and 8.1, respectively) in more detail.
+                     10.1. Iterative reﬁnement with LU factorization. We begin by testing it-
+                 erative reﬁnement (Algorithm 1.1) with LU factorization as the solver, ﬁrst with two
+                 precisions and then three precisions. For each test in this section we list κ (A) (which
+                                                                                        2
+                 we specify as kappa when generating the randsvd matrix), κ (A), and cond(A,x)
+                 above the corresponding plots.                               ∞
+                     10.1.1. Iterative reﬁnement in two precisions. When u = u and u =
+                                                                                  r            f
+                  1/2
+                 u   , so that LU factorization is done at half the working precision, we expect back-
+                 ward errors to converge to level u and forward errors to converge to level cond(A,x)u
+                 for matrices with condition number up to 1/u ; see Table 7.1.
+                                                             f
+                     Results with (u ,u,u ) = (single,double,double) are shown in Figure 10.2 for a
+                                    f     r
+                 matrix with condition number well within the limit of 1/u (top row) and a matrix
+                                                                          f
+                 that is extremely ill conditioned with respect to u  (bottom row). The observed
+                                                                    f
+                 behavior is consistent with the theory: the forward and backward errors all converge
+                 to the expected levels (note the eﬀect of the cond(A,x) term in the forward error
+                 limit). In the second test (bottom row), we see that κ (A) for the generated matrix
+                                                                     ∞
+                 is already close to 1/u . This causes the convergence factor φ to be close to 1, and
+                                       f                                      i
+                 thus many reﬁnement steps are required for convergence. Note from the plots on the
+                 right that φ is dominated by the u kE k   terms.
+                            i                      s   i ∞
+                     10.1.2. Iterative reﬁnement in three precisions. We now demonstrate the
+                 potential beneﬁts of iterative reﬁnement in three precisions. In Figure 10.3 we take
+                 (u ,u,u ) = (single,double,quad) and use the same matrices as in Figure 10.2. Com-
+                   f    r
+                 paring Figure 10.3 with Figure 10.2 shows the beneﬁt of computing the residuals at
+                 twice the working precision: the forward error converges to level u in both cases,
+                 without any dependence on the cond(A,x). Also note that the use of extra precision
+                 in the residual computation has no eﬀect on the rate of convergence (compare the
+                 values of φi in the right-hand plots).
+                     10.2. GMRES-based iterative reﬁnement. We now test GMRES-IR (Algo-
+                 rithm 8.1) with the combinations of precisions described in Table 8.1. For these tests,
+                 within the GMRES method we use the convergence criterion that the relative residual
+                                                   −2   −4         −6
+                 in the 2-norm is no greater than 10 , 10  , and 10   when u is half precision, single
+                 precision, and double precision, respectively. Above the plots for each test, we give
+                                                    e        b−1b−1
+                 κ (A), κ (A), cond(A,x), and κ (A) = κ (U       L A).
+                  2      ∞                       ∞        ∞
+                     10.2.1. GMRES-IR in two precisions. We ﬁrst test GMRES-IR when two
+                                                                2
+                 diﬀerent precisions are used: u = u and u = u . This is the special case that was
+                                               f           r
+                 investigated in [9]. Here we expect convergence of the forward and backward errors
+                 to level u for matrices with κ (A) up to 1/u; see Table 8.1.
+                                             ∞
+                     In Figure 10.4, we use (uf,u,ur) = (half,half,single) and in Figure 10.5 we use
+                 (u ,u,u ) = (single,single,double). For each combination of precisions, we show
+                   f    r
+                 results for a matrix with condition number well within the 1/u limit (top row) and a
+                 matrix that is on the edge of numerical singularity, i.e., κ∞(A) & 1/u (bottom row).
+                 For the reasonably well-conditioned matrices, the results are as expected. For the case
+                 where κ (A) & 1/u, the results are better than expected. Despite A being extremely
+                        ∞
+                 ill conditioned, GMRES-IR succeeds in obtaining backward and forward errors on the
+                 level u, and does so requiring very few GMRES iterations in each reﬁnement step.
+                 20                    ERIN CARSON AND NICHOLAS J. HIGHAM
+                                                 e
+                 Notice that with u    = u, κ (A) can be substantially less than κ (A) even when
+                                    f         ∞                                      ∞
+                 κ (A) is of the order of 1/u; see, e.g., the bottom row in Figure 10.5.
+                  ∞ We note also that the orange pluses in, e.g., Figure 10.5 are at or above 1. That
+                 φi is nevertheless substantially less than 1 is thanks to the min function in (3.9) and
+                 the ameliorating eﬀect of µi, which was ﬁrst pointed out in [9].
+                     10.2.2. GMRES-IR in three precisions. We now show the beneﬁt of using
+                 three precisions in GMRES-IR, with u < u < u . According to the theory, the
+                                                         r           f
+                 forward and backward errors should converge to level u for matrices with κ (A) ≤
+                                                                                              ∞
+                 1/u. In other words, in GMRES-IR we can compute the LU factorization in precision
+                  1/2
+                 u    and still attain the same bounds on the backward and forward errors as if it were
+                 computed in precision u.
+                     Tests with (u ,u,u ) set to (half,single,double) and (single,double,quad) are
+                                   f     r
+                 shown in Figures 10.6 and Figure 10.7, respectively. Again for each set of precisions,
+                 we show results for a matrix with condition number well within the 1/u limit (top
+                 rows) and for a matrix which is extremely ill-conditioned with respect to precision u
+                 (bottom rows).
+                     The results here are consistent with the theory: in all cases we have convergence
+                 of the backward and forward errors to level u. We note that the use of lower precision
+                 for the LU factorization can work very well for reasonably well-conditioned matrices.
+                 For example, in the top row of Figure 10.7 where κ∞(A) = 1.1e+04, only four total
+                 GMRES iterations across two reﬁnement steps are required to obtain the desired
+                 forward and backward errors. We note that standard iterative reﬁnement with LU
+                 factorization also performs well on this problem (see Figure 10.3).
+                     It is important to point out that the number of GMRES iterations in each reﬁne-
+                 ment step increases signiﬁcantly with κ∞(A) for this class of problems. In the bottom
+                 rows in both ﬁgures, where A is extremely ill-conditioned with respect to u, nearly
+                                                                           e
+                 n GMRES iterations are required for each solve. Since A is applied in precision u
+                                                                                                     r
+                 in each GMRES iteration, this will not be eﬃcient compared with simply computing
+                 the LU factorization more accurately.
+                     To show that this approach can indeed still be eﬃcient for some problems, we
+                 now run analogous experiments for problems generated using randsvd mode 2, which
+                 generates matrices having only one small singular value. The results are shown in
+                 Figures 10.8 and 10.9 for GMRES-IR with (u ,u,u ) set to (half,single,double) and
+                                                               f     r
+                 (single,double,quad), respectively.  For mode 2 matrices, the number of GMRES
+                 iterations per reﬁnement step grows more modestly with κ∞(A). For example, in
+                 the bottom row of Figure 10.9, convergence requires only 7 total GMRES iterations
+                                                                        e
+                 even though κ (A) > 1/u. Also note here that κ (A) is still very large compared
+                                ∞                                   ∞
+                 with κ (A), which emphasizes the fact that the GMRES convergence rate cannot be
+                        ∞
+                 connected with the condition number of the preconditioned matrix.
+                     Finally, we consider the more extreme case of GMRES-IR using precisions (u ,
+                                                                                                    f
+                 u, u ) = (half,double,quad). The analysis summarized in Table 8.1 predicts that
+                     r
+                 the forward and backward errors should converge to level u ≈ 10−16 for matrices
+                                       12
+                 with κ∞(A) up to 10 . In other words, in GMRES-IR we can compute the LU
+                 factorization in a quarter of the working precision without increasing the forward or
+                 backward errors.
+                     Weshowtests for randsvd mode 3 matrices in Figure 10.10 and randsvd mode 2
+                 matrices in Figure 10.11. The story is largely the same as in the case of (u ,u,u ) =
+                                                                                            f     r
+                 (single,double,quad) in Figures 10.7 and 10.9. For randsvd mode 3 matrices, al-
+                 though the errors reach the levels predicted by the theory, each solve may require too
+                                    ITERATIVE REFINEMENT IN THREE PRECISIONS                         21
+                 manyGMRESiterationstobepracticalunlessAiswellconditioned(seeFigure10.10).
+                 However, Figure 10.11 shows that for randsvd mode 2 matrices the number of GM-
+                 RESiterations is much more favorable for ill conditioned A. Note that in the bottom
+                 row in Figure 10.10, we encounter overﬂow in computing the initial solution x0 and
+                 thus take x0 = 0.
+                      10.3. Discussion. Theexperiments show that the behaviors in practice of Algo-
+                 rithm 1.1 and Algorithm 8.1 (GMRES-IR) match well the predictions of the analysis,
+                 and even exceed it for GMRES-IR. An important diﬀerence between the two algo-
+                 rithms is that GMRES-IR converges quickly in all cases (at most three iterations
+                 in Figures 10.4–10.11), whereas Algorithm 1.1 using LU factorization can be much
+                 slower. This is related to the fact, visible in the right-hand columns of the plots,
+                 that Algorithm 1.1 with LU factorization is “on the edge” as regards the conver-
+                 gence criteria (φi is close to 1), whereas GMRES-IR satisﬁes the criteria much more
+                 comfortably.
+                      Our experiments conﬁrm that the LU factorization can be computed at less than
+                 the working precision while still obtaining backward errors and forward errors at the
+                 working precision.
+                      Theoverall eﬃciency of GMRES-IR depends on the number of GMRES iterations
+                 required.  Using less than working precision in the LU factorization can in some
+                                                     bb
+                 cases diminish the eﬀectiveness of LU as a preconditioner in GMRES-IR, resulting
+                 in an undesirably high number of GMRES iterations. This can in turn reduce or
+                 outweigh any potential computational savings from computing a lower precision LU
+                 factorization.
+                      Foreaseofcomparisonbetweenapproaches, ourexperimentsuseaconsistentGM-
+                                                                    −2               −4
+                 RES tolerance based on the working precision (10       for single, 10  for double, and
+                 10−6 for quadruple). In practice, however, the GMRES tolerance could be adjusted to
+                 minimize the total number of GMRES iterations performed across reﬁnement steps.
+                                                                          e
+                 The analysis in [9, sec. 3] shows that the smaller κ∞(A), the larger we can set the
+                 GMRES convergence tolerance while still meeting the constraint (2.3); of course, if
+                 the tolerance parameter is made too large, this can increase the number of reﬁnement
+                 steps required for convergence.
+                      Of course, whether changing the GMRES tolerance will result in fewer GMRES
+                 iterations depends on the convergence trajectory of GMRES, which in turn depends
+                                                                                            e
+                 heavily on properties of the linear system. For nonnormal matrices, κ (A) and even
+                                       e                                                ∞
+                 the full spectrum of A, have no direct connection to the GMRES convergence rate,
+                 so we cannot draw any theoretical conclusions.
+                                                                                       e
+                      For normal A, however, we can connect spectral properties of A with the con-
+                 vergence rate of GMRES. Although further investigation is out of the scope of this
+                 work, we brieﬂy mention some potential approaches for improving GMRES-IR per-
+                 formance in cases where the coeﬃcient matrix is normal and GMRES convergence for
+                                                       e
+                 the resulting preconditioned matrix A constructed using lower precision LU factors
+                 is slow. One possibility is to add an additional preconditioner in order to eliminate
+                 eigenvalues or clusters of eigenvalues that cause diﬃculties for GMRES. One could
+                 also incorporate a deﬂation-based technique to eliminate these parts of the spectrum.
+                 Another approach (for any A) is to try a diﬀerent Krylov subspace iterative method;
+                 though it may not have the same guarantees on backward stability, it may provide a
+                 faster convergence rate in practice.
+                  22                     ERIN CARSON AND NICHOLAS J. HIGHAM
+                      11. Conclusions. This work makes two main contributions to the solution of
+                  Ax = b. The ﬁrst contribution is to show that by using three precisions instead
+                  of two in iterative reﬁnement, it is possible to accelerate the solution process and
+                  to obtain more accurate results for a wider class of problems. To be concrete, let
+                  the working precision in which A, b, and the iterates xi are stored be IEEE single
+                  precision and consider the following four forms of iterative reﬁnement, all employing
+                  LUfactorization.
+                        • Method 1 (traditional): factorize A at single precision, compute residuals at
+                          double precision.
+                        • Method2(Langouetal.[23],withsingleanddoubleprecisionthereinreplaced
+                          by half and single precision, respectively): factorize A at half precision, com-
+                          pute residuals at single precision.
+                        • Algorithm 1.1: factorize A at half precision, compute residuals at double
+                          precision.
+                        • GMRES-IR (Algorithm 8.1): factorize A at half precision, compute residuals
+                          at double precision, compute updates using preconditioned GMRES.
+                      Method1isguaranteedtoprovideforwardandbackwarderrorsoforderu ≈ 10−8
+                  as long as κ  (A) < 108. Method 2 is potentially up to twice as fast, since it factorizes
+                              ∞                                     4
+                  at half precision, but it requires κ∞(A) < 10       to guaranteed convergence and it
+                  delivers a forward error of order cond(A,x)u. Algorithm 1.1 improves on Method
+                  2 by delivering a forward error of order u under the same assumption on κ (A).
+                                                                                                    ∞
+                                                                                                      8
+                  GMRES-IRprovides a further improvement because it requires only κ∞(A) < 10 for
+                  convergence, like Method 1. Moreover, it is likely to converge faster than Method 2
+                  and Algorithm 1.1.
+                      The overall speed of GMRES-IR in three precisions depends on the number of
+                  GMRESiterations,whichishardtopredictandcanbelarge. However,wehaveshown
+                  experimentally that for some problems GMRES can converge in a small number of
+                  iterations. (When GMRES-IR is used with just two precisions, as originally proposed
+                  in [9], fast convergence of GMRES is always observed in our experience.)
+                      Further work is needed to tune the GMRES convergence tolerance, to investigate
+                  alternative GMRES preconditioning strategies, and to investigate the speed of the
+                  algorithms in computing environments where half, single, and double precisions are
+                  supported in hardware.
+                      These results can be viewed in a diﬀerent way by comparison with a standard
+                  Ax = b solver based on LU factorization in precision u. By using Algorithm 1.1 or
+                  GMRES-IRwith u =u1/2 we can solve the system more accurately and up to twice
+                                      f
+                  as fast, the speed advantage arising because the O(n3) part of the work is potentially
+                  all done at lower precision.
+                      Thesecondcontributionofthisworkistogivegeneralbackwarderrorandforward
+                  error analyses of iterative reﬁnement that include almost all previous ones as special
+                  cases and improve on some existing results. Crucially, the analyses include four pre-
+                  cisions as parameters, which is necessary in order for them to apply to GMRES-IR.
+                  Ournumerical experiments conﬁrm the predictions of the theory regarding conditions
+                  for convergence and the limiting backward and forward errors of Algorithms 1.1 and
+                  8.1. The analyses should be useful for understanding further algorithmic variants that
+                  may be proposed, for example ones based on approximate LU factors (such as those
+                  from incomplete factorizations), or on diﬀerent iterative solvers.
+                      Our MATLAB codes are available at https://github.com/eccarson/ir3.
+                                                                                      ITERATIVE REFINEMENT IN THREE PRECISIONS                                                                                                                       23
+                                                                   Iterative reﬁnement with LU factorization, (u ,u,u ) = (single,double,double)
+                                                                                                                                                              f           r
+                                                                                                                                      ferr
+                                                                                                                                                                                                         2u 5 (A)7
+                                                                                                                                                                                                              s 1             i
+                                                                                                                                      nbe
+                                                                                                                                                                                                         2u cond(A)
+                                                                                                                                                                                                              s
+                                                                                                                                      cbe
+                                                                                                                                                                                                         u kE k
+                                                                    10-5                                                                                                                                    s      i  1
+                                                                                                                                                           -5                                            ?
+                                                                                                                                                       10                                                   i
+                                                                   10-15
+                                                                                                                                                      10-15
+                                                                          0                                 1                                2                0                                1                                2
+                                                                                              re-nement step                                                                     re-nement step
+                                                                     Iterative reﬁnement with LU factorization, (uf,u,ur) = (single,double,quad)
+                                                                    10-5
+                                                                                                                                                       10-5
+                                                                   10-15
+                                                                                                                                                      10-15
+                                                                          0                                 1                                2                0                                1                                2
+                                                                                              re-nement step                                                                     re-nement step
+                                                                    Iterative reﬁnement with LU factorization, (uf,u,ur) = (double,double,quad)
+                                                                    10-5
+                                                                                                                                                       10-5
+                                                                   10-15
+                                                                                                                                                      10-15
+                                                                          0                                 1                                2                0                                1                                2
+                                                                                              re-nement step                                                                     re-nement step
+                                                                                                                                                                          e
+                                                       GMRES-IR with (u ,u,u ) = (single,double,quad); κ (A) = 5.2e+04, GMRES its: (2,3)
+                                                                                              f           r                                                        ∞
+                                                                    10-5
+                                                                                                                                                       10-5
+                                                                   10-15
+                                                                                                                                                      10-15
+                                                                          0                                 1                                2                0                                1                                2
+                                                                                              re-nement step                                                                     re-nement step
+                                                   Fig. 10.1. Comparison of iterative reﬁnement with LU factorization and GMRES-IR for solving
+                                         Ax = b using various precisions. The matrix is generated using gallery(’randsvd’,100,1e9,2).
+                                         For this problem, κ (A) = 1e+09, κ (A) = 2.0e+10, and cond(A,x) = 5.2e+09.
+                                                                                  2                                    ∞
+                                         24                                                    ERIN CARSON AND NICHOLAS J. HIGHAM
+                                                                                         κ (A) = 1e+03, κ (A) = 1.1e+04, cond(A,x) = 1.9e+03
+                                                                     100                   2                                ∞
+                                                                                                                                      ferr
+                                                                                                                                                                                                         2u 5 (A)7
+                                                                                                                                                                                                              s 1             i
+                                                                                                                                      nbe
+                                                                                                                                                                                                         2u cond(A)
+                                                                                                                                                                                                              s
+                                                                                                                                      cbe
+                                                                                                                                                                                                         u kE k
+                                                                                                                                                                                                            s      i  1
+                                                                                                                                                                                                         ?
+                                                                                                                                                       10-5                                                 i
+                                                                   10-10
+                                                                   10-20                                                                              10-15
+                                                                          0     1     2     3     4     5     6     7     8     9     10 11                  0     1     2     3     4     5     6     7      8     9    10 11
+                                                                                              re-nement step                                                                     re-nement step
+                                                                                         κ (A) = 1e+07, κ (A) = 6.9e+07, cond(A,x) = 9.1e+06
+                                                                     100                   2                                ∞
+                                                                                                                                                       10-5
+                                                                   10-10
+                                                                   10-20                                                                              10-15
+                                                                          0     1     2     3     4     5     6     7     8     9     10 11                  0     1     2     3     4     5     6     7      8     9    10 11
+                                                                                              re-nement step                                                                     re-nement step
+                                            Fig. 10.2. Iterative reﬁnement with LU factorization using (u ,u,ur) = (single,double,double).
+                                                                                                                                                                               f
+                                                                                         κ (A) = 1e+03, κ (A) = 1.1e+04, cond(A,x) = 1.9e+03
+                                                                     100                   2                                ∞
+                                                                                                                                      ferr
+                                                                                                                                                                                                         2u 5 (A)7
+                                                                                                                                                                                                              s 1             i
+                                                                                                                                      nbe
+                                                                                                                                                                                                         2u cond(A)
+                                                                                                                                                                                                              s
+                                                                                                                                      cbe
+                                                                                                                                                                                                         u kE k
+                                                                                                                                                                                                            s      i  1
+                                                                                                                                                                                                         ?
+                                                                                                                                                       10-5                                                 i
+                                                                   10-10
+                                                                   10-20                                                                              10-15
+                                                                          0     1     2     3     4     5     6     7     8     9     10 11                  0     1     2     3     4     5     6     7      8     9    10 11
+                                                                                              re-nement step                                                                     re-nement step
+                                                                                         κ (A) = 1e+07, κ (A) = 6.9e+07, cond(A,x) = 9.1e+06
+                                                                     100                   2                                ∞
+                                                                                                                                                       10-5
+                                                                   10-10
+                                                                   10-20                                                                              10-15
+                                                                          0     1     2     3     4     5     6     7     8     9     10 11                  0     1     2     3     4     5     6     7      8     9    10 11
+                                                                                              re-nement step                                                                     re-nement step
+                                              Fig. 10.3. Iterative reﬁnement with LU factorization using (u ,u,ur) = (single,double,quad).
+                                                                                                                                                                                 f
+                                                                                      ITERATIVE REFINEMENT IN THREE PRECISIONS                                                                                                                       25
+                                                                                                                                                                                   e
+                                                    κ (A) = 1e+01, κ (A) = 2.1e+02, cond(A,x) = 4.4e+01, κ (A) = 7.3e+00, GMRES its: (4)
+                                                       2             102                ∞                                                                                   ∞
+                                                                                                                                      ferr
+                                                                                                                                                                                                         2u 5 (A)7
+                                                                                                                                                                                                              s 1             i
+                                                                                                                                                            1
+                                                                                                                                      nbe
+                                                                                                                                                                                                         2u cond(A)
+                                                                                                                                                        10                                                    s
+                                                                         0
+                                                                                                                                      cbe
+                                                                     10                                                                                                                                  u kE k
+                                                                                                                                                                                                            s      i  1
+                                                                                                                                                                                                         ?
+                                                                                                                                                                                                            i
+                                                                    10-2                                                                               10-1
+                                                                    10-4
+                                                                                                                                                       10-3
+                                                                          0                      1                     2                     3                0                     1                     2                     3
+                                                                                              re-nement step                                                                     re-nement step
+                                                                                                                                                                             e
+                                              κ (A) = 1e+02, κ (A) = 1.4e+03, cond(A,x) = 3.2e+02, κ (A) = 3.0e+02, GMRES its: (5,16,10)
+                                                 2                   102          ∞                                                                                   ∞
+                                                                                                                                                        101
+                                                                     100
+                                                                    10-2                                                                               10-1
+                                                                    10-4
+                                                                                                                                                       10-3
+                                                                          0                      1                     2                     3                0                     1                     2                     3
+                                                                                              re-nement step                                                                     re-nement step
+                                                                                  Fig. 10.4. GMRES-IR using (u ,u,ur) = (half,half,single).
+                                                                                                                                                     f
+                                                                                                                                                                                   e
+                                                    κ (A) = 1e+06, κ (A) = 7.4e+06, cond(A,x) = 1.0e+06, κ (A) = 1.1e+00, GMRES its: (2)
+                                                       2             102                ∞                                                                                   ∞
+                                                                                                                                      ferr
+                                                                                                                                                                                                         2u 5 (A)7
+                                                                                                                                                                                                              s 1             i
+                                                                                                                                      nbe
+                                                                                                                                                                                                         2u cond(A)
+                                                                                                                                                            0                                                 s
+                                                                                                                                                        10
+                                                                                                                                      cbe
+                                                                                                                                                                                                         u kE k
+                                                                    10-2                                                                                                                                    s      i  1
+                                                                                                                                                                                                         ?
+                                                                                                                                                                                                            i
+                                                                    10-6                                                                               10-4
+                                                                   10-10                                                                               10-8
+                                                                          0                                 1                                2                0                                1                                2
+                                                                                              re-nement step                                                                     re-nement step
+                                                                                                                                                                                 e
+                                                  κ (A) = 1e+08, κ (A) = 6.0e+08, cond(A,x) = 8.3e+07, κ (A) = 5.5e+01, GMRES its: (6,7)
+                                                     2               102              ∞                                                                                   ∞
+                                                                                                                                                        100
+                                                                    10-2
+                                                                    10-6                                                                               10-4
+                                                                   10-10                                                                               10-8
+                                                                          0                                 1                                2                0                                1                                2
+                                                                                              re-nement step                                                                     re-nement step
+                                                                             Fig. 10.5. GMRES-IR using (u ,u,ur) = (single,single,double).
+                                                                                                                                                f
+                                         26                                                    ERIN CARSON AND NICHOLAS J. HIGHAM
+                                                                                                                                                                                 e
+                                                  κ (A) = 1e+01, κ (A) = 2.1e+02, cond(A,x) = 4.4e+01, κ (A) = 7.7e+00, GMRES its: (7,7)
+                                                     2               102              ∞                                                                                   ∞
+                                                                                                                                      ferr
+                                                                                                                                                                                                         2u 5 (A)7
+                                                                                                                                                                                                              s 1             i
+                                                                                                                                                            0
+                                                                                                                                      nbe
+                                                                                                                                                                                                         2u cond(A)
+                                                                                                                                                        10                                                    s
+                                                                                                                                      cbe
+                                                                                                                                                                                                         u kE k
+                                                                    10-2                                                                                                                                    s      i  1
+                                                                                                                                                                                                         ?
+                                                                                                                                                                                                            i
+                                                                                                                                                       10-4
+                                                                    10-6
+                                                                   10-10                                                                               10-8
+                                                                          0                      1                     2                     3                0                     1                     2                     3
+                                                                                              re-nement step                                                                     re-nement step
+                                                                                                                                                                           e
+                                            κ (A) = 1e+06, κ (A) = 7.4e+06, cond(A,x) = 1.0e+06, κ (A) = 5.8e+05, GMRES its: (90,100,91)
+                                               2                     102        ∞                                                                                   ∞
+                                                                                                                                                        100
+                                                                    10-2
+                                                                                                                                                       10-4
+                                                                    10-6
+                                                                   10-10                                                                               10-8
+                                                                          0                      1                     2                     3                0                     1                     2                     3
+                                                                                              re-nement step                                                                     re-nement step
+                                                                               Fig. 10.6. GMRES-IR using (uf,u,ur) = (half,single,double).
+                                                                                                                                                                                 e
+                                                  κ (A) = 1e+03, κ (A) = 1.1e+04, cond(A,x) = 1.9e+03, κ (A) = 1.0e+00, GMRES its: (2,2)
+                                                     2                                ∞                                                                                   ∞
+                                                                                                                                      ferr
+                                                                                                                                                                                                         2u 5 (A)7
+                                                                                                                                                                                                              s 1             i
+                                                                                                                                      nbe
+                                                                                                                                                                                                         2u cond(A)
+                                                                                                                                                                                                              s
+                                                                                                                                      cbe
+                                                                                                                                                                                                         u kE k
+                                                                    10-5                                                                                                                                    s      i  1
+                                                                                                                                                           -5
+                                                                                                                                                       10                                                ?
+                                                                                                                                                                                                            i
+                                                                   10-15
+                                                                                                                                                      10-15
+                                                                          0                      1                     2                     3                0                     1                     2                     3
+                                                                                              re-nement step                                                                     re-nement step
+                                                                                                                                                                            e
+                                             κ (A) = 1e+15, κ (A) = 5.3e+15, cond(A,x) = 6.3e+14, κ (A) = 1.4e+10, GMRES its: (91,92,92)
+                                                2                                ∞                                                                                   ∞
+                                                                    10-5                                                                                   -5
+                                                                                                                                                       10
+                                                                   10-15
+                                                                                                                                                      10-15
+                                                                          0                      1                     2                     3                0                     1                     2                     3
+                                                                                              re-nement step                                                                     re-nement step
+                                                                              Fig. 10.7. GMRES-IR using (u ,u,ur) = (single,double,quad).
+                                                                                                                                                 f
+                                                                                      ITERATIVE REFINEMENT IN THREE PRECISIONS                                                                                                                       27
+                                                                                                                                                                                 e
+                                                  κ (A) = 1e+01, κ (A) = 2.1e+02, cond(A,x) = 5.5e+01, κ (A) = 1.4e+01, GMRES its: (5,6)
+                                                     2               102              ∞                                                                                   ∞
+                                                                                                                                      ferr
+                                                                                                                                                                                                         2u 5 (A)7
+                                                                                                                                                                                                              s 1             i
+                                                                                                                                                            0
+                                                                                                                                      nbe
+                                                                                                                                                                                                         2u cond(A)
+                                                                                                                                                        10                                                    s
+                                                                                                                                      cbe
+                                                                                                                                                                                                         u kE k
+                                                                    10-2                                                                                                                                    s      i  1
+                                                                                                                                                                                                         ?
+                                                                                                                                                                                                            i
+                                                                                                                                                       10-4
+                                                                    10-6
+                                                                   10-10                                                                               10-8
+                                                                          0                      1                     2                     3                0                     1                     2                     3
+                                                                                              re-nement step                                                                     re-nement step
+                                                                                                                                                                              e
+                                               κ (A) = 1e+05, κ (A) = 2.0e+06, cond(A,x) = 5.2e+05, κ (A) = 7.7e+06, GMRES its: (7,24,9)
+                                                  2                  102           ∞                                                                                   ∞
+                                                                                                                                                        100
+                                                                    10-2
+                                                                                                                                                       10-4
+                                                                    10-6
+                                                                   10-10                                                                               10-8
+                                                                          0                      1                     2                     3                0                     1                     2                     3
+                                                                                              re-nement step                                                                     re-nement step
+                                                   Fig. 10.8. GMRES-IR using (u ,u,ur) = (half,single,double). The matrices are generated
+                                                                                                                         f
+                                         using randsvd mode 2 (cf. Figure 10.6, which uses mode 3).
+                                                                                                                                                                                 e
+                                                  κ (A) = 1e+03, κ (A) = 2.0e+04, cond(A,x) = 5.2e+03, κ (A) = 1.0e+00, GMRES its: (1,2)
+                                                     2                                ∞                                                                                   ∞
+                                                                                                                                      ferr
+                                                                                                                                                                                                         2u 5 (A)7
+                                                                                                                                                                                                              s 1             i
+                                                                                                                                      nbe
+                                                                                                                                                                                                         2u cond(A)
+                                                                                                                                                                                                              s
+                                                                                                                                      cbe
+                                                                                                                                                                                                         u kE k
+                                                                    10-5                                                                                                                                    s      i  1
+                                                                                                                                                           -5
+                                                                                                                                                       10                                                ?
+                                                                                                                                                                                                            i
+                                                                   10-15
+                                                                                                                                                      10-15
+                                                                          0                                 1                                2                0                                1                                2
+                                                                                              re-nement step                                                                     re-nement step
+                                                                                                                                                                                 e
+                                                  κ (A) = 1e+15, κ (A) = 1.9e+16, cond(A,x) = 5.1e+15, κ (A) = 1.6e+10, GMRES its: (3,4)
+                                                     2                                ∞                                                                                   ∞
+                                                                    10-5                                                                                   -5
+                                                                                                                                                       10
+                                                                   10-15
+                                                                                                                                                      10-15
+                                                                          0                                 1                                2                0                                1                                2
+                                                                                              re-nement step                                                                     re-nement step
+                                                   Fig. 10.9. GMRES-IR using (u ,u,ur) = (single,double,quad). The matrices are generated
+                                                                                                                        f
+                                         using randsvd mode 2 (cf. Figure 10.7, which uses mode 3).
+                                         28                                                    ERIN CARSON AND NICHOLAS J. HIGHAM
+                                                                                                                                                                               e
+                                                 κ (A) = 1e+01, κ (A) = 2.1e+02, cond(A,x) = 4.4e+01, κ (A) = 7.4e+00, GMRES its: (9,9,9)
+                                                   2                                ∞                                                                                    ∞
+                                                                                                                                      ferr
+                                                                                                                                                                                                         2u 5 (A)7
+                                                                                                                                                                                                              s 1             i
+                                                                                                                                      nbe
+                                                                                                                                                                                                         2u cond(A)
+                                                                                                                                                                                                              s
+                                                                                                                                      cbe
+                                                                                                                                                                                                         u kE k
+                                                                    10-5                                                                                                                                    s      i  1
+                                                                                                                                                           -5
+                                                                                                                                                       10                                                ?
+                                                                                                                                                                                                            i
+                                                                   10-15
+                                                                                                                                                      10-15
+                                                                          0                      1                     2                     3                0                     1                     2                     3
+                                                                                              re-nement step                                                                     re-nement step
+                                                                                                                                                                             e
+                                              κ (A) = 1e+12, κ (A) = 5.7e+12, cond(A,x) = 6.8e+11, κ (A) = 6.0e+11, GMRES its: (100,100)
+                                                2                                 ∞                                                                                   ∞
+                                                                    10-5                                                                                   -5
+                                                                                                                                                       10
+                                                                   10-15
+                                                                                                                                                      10-15
+                                                                          0                      1                     2                     3                0                     1                     2                     3
+                                                                                              re-nement step                                                                     re-nement step
+                                                   Fig. 10.10. GMRES-IR using (u ,u,ur) = (half,double,quad). The matrices are generated
+                                                                                                                           f
+                                         using randsvd mode 3.
+                                                                                                                                                                               e
+                                                 κ (A) = 1e+01, κ (A) = 2.1e+02, cond(A,x) = 5.5e+01, κ (A) = 1.4e+01, GMRES its: (8,8,8)
+                                                   2                                ∞                                                                                    ∞
+                                                                                                                                      ferr
+                                                                                                                                                                                                         2u 5 (A)7
+                                                                                                                                                                                                              s 1             i
+                                                                                                                                      nbe
+                                                                                                                                                                                                         2u cond(A)
+                                                                                                                                                                                                              s
+                                                                                                                                      cbe
+                                                                                                                                                                                                         u kE k
+                                                                    10-5                                                                                                                                    s      i  1
+                                                                                                                                                           -5
+                                                                                                                                                       10                                                ?
+                                                                                                                                                                                                            i
+                                                                   10-15
+                                                                                                                                                      10-15
+                                                                          0                      1                     2                     3                0                     1                     2                     3
+                                                                                              re-nement step                                                                     re-nement step
+                                                                                                                                                                            e
+                                             κ (A) = 1e+12, κ (A) = 2.0e+13, cond(A,x) = 5.2e+12, κ (A) = 1.4e+13, GMRES its: (17,19,19)
+                                                2                                ∞                                                                                   ∞
+                                                                    10-5                                                                                   -5
+                                                                                                                                                       10
+                                                                   10-15
+                                                                                                                                                      10-15
+                                                                          0                      1                     2                     3                0                     1                     2                     3
+                                                                                              re-nement step                                                                     re-nement step
+                                                   Fig. 10.11. GMRES-IR using (u ,u,ur) = (half,double,quad). The matrices are generated
+                                                                                                                           f
+                                         using randsvd mode 2.
+                                                   ITERATIVE REFINEMENT IN THREE PRECISIONS                                                    29
+                                                                            REFERENCES
+                           [1] A. Abdelfattah, H. Anzt, J. Dongarra, M. Gates, A. Haidar, J. Kurzak, P. Luszczek, S. Tomov,
+                                    I. Yamazaki, and A. YarKhan. Linear algebra software for large-scale accelerated multicore
+                                    computing. Acta Numerica, 25:1–160, 2016.
+                           [2] Emmanuel Agullo, Jim Demmel, Jack Dongarra, Bilel Hadri, Jakub Kurzak, Julien Langou,
+                                    Hatem Ltaief, Piotr Luszczek, and Stanimire Tomov. Numerical linear algebra on emerg-
+                                    ing architectures: the PLASMA and MAGMA projects. Journal of Physics: Conference
+                                    Series, 180(1):012037, 2009.
+                           [3] E. Anderson, Z. Bai, C. H. Bischof, S. Blackford, J. W. Demmel, J. J. Dongarra, J. J. Du Croz,
+                                    A. Greenbaum, S. J. Hammarling, A. McKenney, and D. C. Sorensen. LAPACK Users’
+                                    Guide. Third edition, Society for Industrial and Applied Mathematics, Philadelphia, PA,
+                                    USA, 1999. xxvi+407 pp. ISBN 0-89871-447-8.
+                           [4] Edward Anderson. Robust triangular solves for use in condition estimation. Technical Report
+                                    CS-91-142, Department of Computer Science, University of Tennessee, Knoxville, TN,
+                                    USA, August 1991. 35 pp. LAPACK Working Note 36.
+                           [5] M. Arioli, J. W. Demmel, and I. S. Duﬀ. Solving sparse linear systems with sparse backward
+                                    error. SIAM J. Matrix Anal. Appl., 10(2):165–190, 1989.
+                           [6] M. Arioli and I. S. Duﬀ. Using FGMRES to obtain backward stability in mixed precision.
+                                    Electron. Trans. Numer. Anal., 33:31–44, 2009.
+                           [7] M. Arioli, I. S. Duﬀ, S. Gratton, and S. Pralet. A note on GMRES preconditioned by a
+                                    perturbed LDLT decomposition with static pivoting. SIAM J. Sci. Comput., 29(5):2024–
+                                    2044, 2007.
+                           [8] M. Arioli and J. Scott. Chebyshev acceleration of iterative reﬁnement. Numer. Algorithms, 66
+                                    (3):591–608, 2014.
+                           [9] Erin Carson and Nicholas J. Higham. A new analysis of iterative reﬁnement and its application
+                                    to accurate solution of ill-conditioned sparse linear systems. MIMS EPrint 2017.12, Manch-
+                                    ester Institute for Mathematical Sciences, The University of Manchester, UK, March 2017.
+                                    23 pp. Revised July 2017. Submitted to SIAM J. Sci. Comput.
+                         [10] James W. Demmel and Xiaoye Li. Faster numerical algorithms via exception handling. IEEE
+                                    Trans. Comput., 43(8):983–992, 1994.
+                         [11] Craig C. Douglas, Jan Mandel, and Willard L. Miranker. Fast hybrid solution of algebraic
+                                    systems. SIAM J. Sci. Statist. Comput., 11(6):1073–1086, 1990.
+                         [12] L. Fox, H. D. Huskey, and J. H. Wilkinson. Notes on the solution of algebraic linear simultaneous
+                                    equations. Quart. J. Mech. Appl. Math., 1:149–173, 1948.
+                         [13] L. Fox, H. D. Huskey, and J. H. Wilkinson. The solution of algebraic linear simultaneous equa-
+                                    tions by punched card methods. Report, Mathematics Division, Department of Scientiﬁc
+                                    andIndustrial Research, National Physical Laboratory, Teddington, UK, 1948. 8 pp. “This
+                                    note was intended to be included as” section 5 of [12], “but was ﬁnally omitted for reasons
+                                    of economy of space”.
+                         [14] Philip E. Gill, Michael A. Saunders, and Joseph R. Shinnerl. On the stability of Cholesky
+                                    factorization for symmetric quasideﬁnite systems. SIAM J. Matrix Anal. Appl., 17(1):
+                                    35–46, 1996.
+                         [15] Anne Greenbaum, Vlastimil Pt´ak, and Zdenˇek Strakoˇs. Any nonincreasing convergence curve
+                                    is possible for GMRES. SIAM J. Matrix Anal. Appl., 17(3):465–469, 1996.
+                         [16] Nicholas J. Higham. Iterative reﬁnement enhances the stability of QR factorization methods
+                                    for solving linear equations. BIT, 31:447–468, 1991.
+                         [17] Nicholas J. Higham. Iterative reﬁnement for linear systems and LAPACK. IMA J. Numer.
+                                    Anal., 17(4):495–509, 1997.
+                         [18] Nicholas J. Higham. Accuracy and Stability of Numerical Algorithms. Second edition, Society
+                                    for Industrial and Applied Mathematics, Philadelphia, PA, USA, 2002. xxx+680 pp. ISBN
+                                    0-89871-521-0.
+                         [19] J. D. Hogg and J. A. Scott. A fast and robust mixed-precision solver for the solution of sparse
+                                    symmetric linear systems. ACM Trans. Math. Software, 37(2):17:1–17:24, 2010.
+                         [20] IEEE Standard for Floating-Point Arithmetic, IEEE Std 754-2008 (revision of IEEE Std 754-
+                                    1985). IEEE Computer Society, New York, 2008. 58 pp. ISBN 978-0-7381-5752-8.
+                         [21] M. Jankowski and H. Wo´zniakowski. Iterative reﬁnement implies numerical stability. BIT, 17:
+                                    303–311, 1977.
+                         [22] Andrzej Kie lbasinski.´      Iterative reﬁnement for linear systems in variable-precision arithmetic.
+                                    BIT, 21(1):97–103, 1981.
+                         [23] Julie Langou, Julien Langou, Piotr Luszczek, Jakub Kurzak, Alfredo Buttari, and Jack Don-
+                                    garra. Exploiting the performance of 32 bit ﬂoating point arithmetic in obtaining 64 bit
+                 30                     ERIN CARSON AND NICHOLAS J. HIGHAM
+                          accuracy (revisiting iterative reﬁnement for linear systems). In Proceedings of the 2006
+                          ACM/IEEE Conference on Supercomputing, November 2006.
+                  [24] J¨org Liesen and Petr Tichy.` The worst-case GMRES for normal matrices. BIT, 44(1):79–98,
+                          2004.
+                  [25] Cleve B. Moler. Cleve Laboratory. http://uk.mathworks.com/matlabcentral/fileexchange/
+                          59085-cleve-laborator.
+                  [26] Cleve B. Moler. Iterative reﬁnement in ﬂoating point. J. Assoc. Comput. Mach., 14(2):316–321,
+                          1967.
+                  [27] Cleve B. Moler. “Half precision” 16-bit ﬂoating point arithmetic. http://blogs.mathworks.
+                          com/cleve/2017/05/08/half-precision-16-bit-floating-point-arithmetic/,    May
+                          2017.
+                  [28] Multiprecision Computing Toolbox. Advanpix, Tokyo. http://www.advanpix.com.
+                  [29] W. Oettli and W. Prager. Compatibility of approximate solution of linear equations with given
+                          error bounds for coeﬃcients and right-hand sides. Numer. Math., 6:405–409, 1964.
+                  [30] J. L. Rigal and J. Gaches. On the compatibility of a given solution with the data of a linear
+                          system. J. Assoc. Comput. Mach., 14(3):543–548, 1967.
+                  [31] Robert D. Skeel. Iterative reﬁnement implies numerical stability for Gaussian elimination.
+                          Math. Comp., 35(151):817–832, 1980.
+                  [32] Alicja Smoktunowicz and Jolanta Sokolnicka. Binary cascades iterative reﬁnement in doubled-
+                          mantissa arithmetics. BIT, 24(1):123–127, 1984.
+                  [33] G. W. Stewart. Introduction to Matrix Computations. Academic Press, New York, 1973.
+                          xiii+441 pp. ISBN 0-12-670350-7.
+                  [34] Fran¸coise Tisseur. Newton’s method in ﬂoating point arithmetic and iterative reﬁnement of
+                          generalized eigenvalue problems. SIAM J. Matrix Anal. Appl., 22(4):1038–1057, 2001.
+                  [35] J. H. Wilkinson. Progress report on the Automatic Computing Engine. Report MA/17/1024,
+                          Mathematics Division, Department of Scientiﬁc and Industrial Research, National Physical
+                          Laboratory, Teddington, UK, April 1948. 127 pp.
+                  [36] J. H. Wilkinson. Rounding Errors in Algebraic Processes. Notes on Applied Science No. 32, Her
+                          Majesty’s Stationery Oﬃce, London, 1963. vi+161 pp. Also published by Prentice-Hall,
+                          Englewood Cliﬀs, NJ, USA. Reprinted by Dover, New York, 1994. ISBN 0-486-67999-3.
+                  [37] J. H. Wilkinson. Modern error analysis. SIAM Rev., 13(4):548–568, 1971.
+                  [38] Zahari Zlatev. Use of iterative reﬁnement in the solution of sparse linear systems. SIAM J.
+                          Numer. Anal., 19(2):381–399, 1982.

@@ -1,0 +1,80 @@
+--- task1_glu.bak_rho/src/glu_api.c	2026-10-16 12:59:35.000000000 +0800
++++ task1_glu/src/glu_api.c	2026-10-30 13:33:15.400375349 +0800
+@@ -34,12 +34,18 @@
+ #ifdef GLU_ENABLE_GPU
+         if (glu_device_count() <= 0)
+             return GLU_ERR_UNSUPPORTED;
+-        return glu_gpu_factorize_dense(A, sym, out);
++        { glu_status st = glu_gpu_factorize_dense(A, sym, out);
++          if (st == GLU_OK && out && *out) glu_report_rho(*out, A);
++          return st; }
+ #else
+         return GLU_ERR_UNSUPPORTED;
+ #endif
+     }
+-    return glu_factorize_dense_cpu(A, sym, out);
++    {
++        glu_status st = glu_factorize_dense_cpu(A, sym, out);
++        if (st == GLU_OK && out && *out) glu_report_rho(*out, A);
++        return st;
++    }
+ }
+ 
+ glu_status
+--- task1_glu.bak_rho/src/glu_internal.h	2026-10-16 15:26:16.000000000 +0800
++++ task1_glu/src/glu_internal.h	2026-10-30 13:33:15.400375349 +0800
+@@ -193,6 +193,8 @@
+ void glu_dense_solve_host(const double *lu, int n, const int32_t *piv,
+                           int nrhs, const double *b, double *x, int transpose);
+ 
++void glu_report_rho(const glu_factor *f, const glu_csr_d *A);
++
+ /* ------------------------------------------------------------------ */
+ /* GPU entry points.  These are provided by glu_numeric_gpu.cu and are   */
+ /* only linked when GLU_ENABLE_GPU is defined.                           */
+@@ -216,8 +218,8 @@
+                                          glu_factor_stats *stats);
+ #endif
+ 
+-#ifdef __cplusplus
+-}
+-#endif
++#ifdef __cplusplus
++}
++#endif
+ 
+ #endif /* GLU_INTERNAL_H */
+--- task1_glu.bak_rho/Makefile	2026-10-16 18:17:44.000000000 +0800
++++ task1_glu/Makefile	2026-10-30 13:33:15.400375349 +0800
+@@ -21,7 +21,7 @@
+ CFLAGS   += -O3 -std=gnu99 -D_POSIX_C_SOURCE=199309L -Wall -Wextra -Wno-unused-parameter
+ CXXFLAGS += -O3 -std=c++14 -Wall -Wextra -Wno-unused-parameter
+ 
+-SRC_C   = src/glu_util.c src/glu_mindeg.c src/glu_symbolic.c \
++SRC_C   = src/glu_util.c src/glu_mindeg.c src/glu_symbolic.c src/glu_rho.c \
+           src/glu_numeric_cpu.c src/glu_api.c
+ SRC_OBJ = $(patsubst src/%.c,$(BUILD)/%.o,$(SRC_C))
+ 
+--- task1_glu.bak_rho/src/glu_rho.c	2026-10-30 13:33:15.380373917 +0800
++++ task1_glu/src/glu_rho.c	2026-10-30 13:33:36.601893763 +0800
+@@ -1,8 +1,9 @@
+ /* glu_rho.c -- 分解后即时估算分量式增长因子 rho，并预测可达残差
+  *
+- *   rho = || diag(1/row_scale) |L||U| e ||_inf / ||A||_inf
++ *   rho = || diag(row_scale) |L||U| e ||_inf / ||A||_inf
++ *   （分解的是 D^-1 A，故 A = D L U，误差界乘 D 而不是除）
+  *
+- * 理论依据:  |dA| <= u_f * diag(1/row_scale) |L||U|
++ * 理论依据:  |dA| <= u_f * diag(row_scale) |L||U|
+  *            =>  可达相对残差 ~ rho * u_f
+  * 所以打印 rho 就等于打印"这个矩阵能不能上低精度"。
+  *
+@@ -59,7 +60,7 @@
+         int r = f->sym ? f->sym->perm[i] : i;
+         double sc = (f->row_scale && f->row_scale[r] != 0.0)
+                     ? fabs(f->row_scale[r]) : 1.0;
+-        double v = s[i] / sc;
++        double v = s[i] * sc;   /* A = D * (D^-1 A) = D * L U */
+         if (v > rho) rho = v;
+     }
+     if (normA > 0.0) rho /= normA;

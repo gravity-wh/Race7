@@ -1,0 +1,90 @@
+0 sky130_bandgap /workspace/x201_paper/s0/sky130-bandgap-reference-pvt.mtx /workspace/x201_paper/s0/sky130-bandgap-reference-pvt.rhs
+1 sky130_flash /workspace/x201_paper/s0/sky130-flash-adc-3bit-pvt.mtx /workspace/x201_paper/s0/sky130-flash-adc-3bit-pvt.rhs
+2 pg2k /workspace/race7_code/data/s0/pg2k.mtx /workspace/race7_code/data/s0/pg2k.rhs
+3 pg5k /workspace/race7_code/data/s0/pg5k.mtx /workspace/race7_code/data/s0/pg5k.rhs
+4 sky130_bandgap /workspace/x201_paper/s0/sky130-bandgap-reference-pvt.mtx /workspace/x201_paper/s0/sky130-bandgap-reference-pvt.rhs
+5 sky130_flash /workspace/x201_paper/s0/sky130-flash-adc-3bit-pvt.mtx /workspace/x201_paper/s0/sky130-flash-adc-3bit-pvt.rhs
+6 pg2k /workspace/race7_code/data/s0/pg2k.mtx /workspace/race7_code/data/s0/pg2k.rhs
+7 pg5k /workspace/race7_code/data/s0/pg5k.mtx /workspace/race7_code/data/s0/pg5k.rhs
+8 sky130_bandgap /workspace/x201_paper/s0/sky130-bandgap-reference-pvt.mtx /workspace/x201_paper/s0/sky130-bandgap-reference-pvt.rhs
+9 sky130_flash /workspace/x201_paper/s0/sky130-flash-adc-3bit-pvt.mtx /workspace/x201_paper/s0/sky130-flash-adc-3bit-pvt.rhs
+10 pg2k /workspace/race7_code/data/s0/pg2k.mtx /workspace/race7_code/data/s0/pg2k.rhs
+11 pg5k /workspace/race7_code/data/s0/pg5k.mtx /workspace/race7_code/data/s0/pg5k.rhs
+12 sky130_bandgap /workspace/x201_paper/s0/sky130-bandgap-reference-pvt.mtx /workspace/x201_paper/s0/sky130-bandgap-reference-pvt.rhs
+13 sky130_flash /workspace/x201_paper/s0/sky130-flash-adc-3bit-pvt.mtx /workspace/x201_paper/s0/sky130-flash-adc-3bit-pvt.rhs
+14 pg2k /workspace/race7_code/data/s0/pg2k.mtx /workspace/race7_code/data/s0/pg2k.rhs
+15 pg5k /workspace/race7_code/data/s0/pg5k.mtx /workspace/race7_code/data/s0/pg5k.rhs
+16 sky130_bandgap /workspace/x201_paper/s0/sky130-bandgap-reference-pvt.mtx /workspace/x201_paper/s0/sky130-bandgap-reference-pvt.rhs
+17 sky130_flash /workspace/x201_paper/s0/sky130-flash-adc-3bit-pvt.mtx /workspace/x201_paper/s0/sky130-flash-adc-3bit-pvt.rhs
+18 pg2k /workspace/race7_code/data/s0/pg2k.mtx /workspace/race7_code/data/s0/pg2k.rhs
+19 pg5k /workspace/race7_code/data/s0/pg5k.mtx /workspace/race7_code/data/s0/pg5k.rhs
+20 sky130_bandgap /workspace/x201_paper/s0/sky130-bandgap-reference-pvt.mtx /workspace/x201_paper/s0/sky130-bandgap-reference-pvt.rhs
+21 sky130_flash /workspace/x201_paper/s0/sky130-flash-adc-3bit-pvt.mtx /workspace/x201_paper/s0/sky130-flash-adc-3bit-pvt.rhs
+22 pg2k /workspace/race7_code/data/s0/pg2k.mtx /workspace/race7_code/data/s0/pg2k.rhs
+23 pg5k /workspace/race7_code/data/s0/pg5k.mtx /workspace/race7_code/data/s0/pg5k.rhs
+24 sky130_bandgap /workspace/x201_paper/s0/sky130-bandgap-reference-pvt.mtx /workspace/x201_paper/s0/sky130-bandgap-reference-pvt.rhs
+25 sky130_flash /workspace/x201_paper/s0/sky130-flash-adc-3bit-pvt.mtx /workspace/x201_paper/s0/sky130-flash-adc-3bit-pvt.rhs
+26 pg2k /workspace/race7_code/data/s0/pg2k.mtx /workspace/race7_code/data/s0/pg2k.rhs
+27 pg5k /workspace/race7_code/data/s0/pg5k.mtx /workspace/race7_code/data/s0/pg5k.rhs
+28 sky130_bandgap /workspace/x201_paper/s0/sky130-bandgap-reference-pvt.mtx /workspace/x201_paper/s0/sky130-bandgap-reference-pvt.rhs
+29 sky130_flash /workspace/x201_paper/s0/sky130-flash-adc-3bit-pvt.mtx /workspace/x201_paper/s0/sky130-flash-adc-3bit-pvt.rhs
+30 pg2k /workspace/race7_code/data/s0/pg2k.mtx /workspace/race7_code/data/s0/pg2k.rhs
+31 pg5k /workspace/race7_code/data/s0/pg5k.mtx /workspace/race7_code/data/s0/pg5k.rhs
+32 sky130_bandgap /workspace/x201_paper/s0/sky130-bandgap-reference-pvt.mtx /workspace/x201_paper/s0/sky130-bandgap-reference-pvt.rhs
+33 sky130_flash /workspace/x201_paper/s0/sky130-flash-adc-3bit-pvt.mtx /workspace/x201_paper/s0/sky130-flash-adc-3bit-pvt.rhs
+34 pg2k /workspace/race7_code/data/s0/pg2k.mtx /workspace/race7_code/data/s0/pg2k.rhs
+35 pg5k /workspace/race7_code/data/s0/pg5k.mtx /workspace/race7_code/data/s0/pg5k.rhs
+36 sky130_bandgap /workspace/x201_paper/s0/sky130-bandgap-reference-pvt.mtx /workspace/x201_paper/s0/sky130-bandgap-reference-pvt.rhs
+37 sky130_flash /workspace/x201_paper/s0/sky130-flash-adc-3bit-pvt.mtx /workspace/x201_paper/s0/sky130-flash-adc-3bit-pvt.rhs
+38 pg2k /workspace/race7_code/data/s0/pg2k.mtx /workspace/race7_code/data/s0/pg2k.rhs
+39 pg5k /workspace/race7_code/data/s0/pg5k.mtx /workspace/race7_code/data/s0/pg5k.rhs
+40 sky130_bandgap /workspace/x201_paper/s0/sky130-bandgap-reference-pvt.mtx /workspace/x201_paper/s0/sky130-bandgap-reference-pvt.rhs
+41 sky130_flash /workspace/x201_paper/s0/sky130-flash-adc-3bit-pvt.mtx /workspace/x201_paper/s0/sky130-flash-adc-3bit-pvt.rhs
+42 pg2k /workspace/race7_code/data/s0/pg2k.mtx /workspace/race7_code/data/s0/pg2k.rhs
+43 pg5k /workspace/race7_code/data/s0/pg5k.mtx /workspace/race7_code/data/s0/pg5k.rhs
+44 sky130_bandgap /workspace/x201_paper/s0/sky130-bandgap-reference-pvt.mtx /workspace/x201_paper/s0/sky130-bandgap-reference-pvt.rhs
+45 sky130_flash /workspace/x201_paper/s0/sky130-flash-adc-3bit-pvt.mtx /workspace/x201_paper/s0/sky130-flash-adc-3bit-pvt.rhs
+46 pg2k /workspace/race7_code/data/s0/pg2k.mtx /workspace/race7_code/data/s0/pg2k.rhs
+47 pg5k /workspace/race7_code/data/s0/pg5k.mtx /workspace/race7_code/data/s0/pg5k.rhs
+48 sky130_bandgap /workspace/x201_paper/s0/sky130-bandgap-reference-pvt.mtx /workspace/x201_paper/s0/sky130-bandgap-reference-pvt.rhs
+49 sky130_flash /workspace/x201_paper/s0/sky130-flash-adc-3bit-pvt.mtx /workspace/x201_paper/s0/sky130-flash-adc-3bit-pvt.rhs
+50 pg2k /workspace/race7_code/data/s0/pg2k.mtx /workspace/race7_code/data/s0/pg2k.rhs
+51 pg5k /workspace/race7_code/data/s0/pg5k.mtx /workspace/race7_code/data/s0/pg5k.rhs
+52 sky130_bandgap /workspace/x201_paper/s0/sky130-bandgap-reference-pvt.mtx /workspace/x201_paper/s0/sky130-bandgap-reference-pvt.rhs
+53 sky130_flash /workspace/x201_paper/s0/sky130-flash-adc-3bit-pvt.mtx /workspace/x201_paper/s0/sky130-flash-adc-3bit-pvt.rhs
+54 pg2k /workspace/race7_code/data/s0/pg2k.mtx /workspace/race7_code/data/s0/pg2k.rhs
+55 pg5k /workspace/race7_code/data/s0/pg5k.mtx /workspace/race7_code/data/s0/pg5k.rhs
+56 sky130_bandgap /workspace/x201_paper/s0/sky130-bandgap-reference-pvt.mtx /workspace/x201_paper/s0/sky130-bandgap-reference-pvt.rhs
+57 sky130_flash /workspace/x201_paper/s0/sky130-flash-adc-3bit-pvt.mtx /workspace/x201_paper/s0/sky130-flash-adc-3bit-pvt.rhs
+58 pg2k /workspace/race7_code/data/s0/pg2k.mtx /workspace/race7_code/data/s0/pg2k.rhs
+59 pg5k /workspace/race7_code/data/s0/pg5k.mtx /workspace/race7_code/data/s0/pg5k.rhs
+60 sky130_bandgap /workspace/x201_paper/s0/sky130-bandgap-reference-pvt.mtx /workspace/x201_paper/s0/sky130-bandgap-reference-pvt.rhs
+61 sky130_flash /workspace/x201_paper/s0/sky130-flash-adc-3bit-pvt.mtx /workspace/x201_paper/s0/sky130-flash-adc-3bit-pvt.rhs
+62 pg2k /workspace/race7_code/data/s0/pg2k.mtx /workspace/race7_code/data/s0/pg2k.rhs
+63 pg5k /workspace/race7_code/data/s0/pg5k.mtx /workspace/race7_code/data/s0/pg5k.rhs
+64 sky130_bandgap /workspace/x201_paper/s0/sky130-bandgap-reference-pvt.mtx /workspace/x201_paper/s0/sky130-bandgap-reference-pvt.rhs
+65 sky130_flash /workspace/x201_paper/s0/sky130-flash-adc-3bit-pvt.mtx /workspace/x201_paper/s0/sky130-flash-adc-3bit-pvt.rhs
+66 pg2k /workspace/race7_code/data/s0/pg2k.mtx /workspace/race7_code/data/s0/pg2k.rhs
+67 pg5k /workspace/race7_code/data/s0/pg5k.mtx /workspace/race7_code/data/s0/pg5k.rhs
+68 sky130_bandgap /workspace/x201_paper/s0/sky130-bandgap-reference-pvt.mtx /workspace/x201_paper/s0/sky130-bandgap-reference-pvt.rhs
+69 sky130_flash /workspace/x201_paper/s0/sky130-flash-adc-3bit-pvt.mtx /workspace/x201_paper/s0/sky130-flash-adc-3bit-pvt.rhs
+70 pg2k /workspace/race7_code/data/s0/pg2k.mtx /workspace/race7_code/data/s0/pg2k.rhs
+71 pg5k /workspace/race7_code/data/s0/pg5k.mtx /workspace/race7_code/data/s0/pg5k.rhs
+72 sky130_bandgap /workspace/x201_paper/s0/sky130-bandgap-reference-pvt.mtx /workspace/x201_paper/s0/sky130-bandgap-reference-pvt.rhs
+73 sky130_flash /workspace/x201_paper/s0/sky130-flash-adc-3bit-pvt.mtx /workspace/x201_paper/s0/sky130-flash-adc-3bit-pvt.rhs
+74 pg2k /workspace/race7_code/data/s0/pg2k.mtx /workspace/race7_code/data/s0/pg2k.rhs
+75 pg5k /workspace/race7_code/data/s0/pg5k.mtx /workspace/race7_code/data/s0/pg5k.rhs
+76 sky130_bandgap /workspace/x201_paper/s0/sky130-bandgap-reference-pvt.mtx /workspace/x201_paper/s0/sky130-bandgap-reference-pvt.rhs
+77 sky130_flash /workspace/x201_paper/s0/sky130-flash-adc-3bit-pvt.mtx /workspace/x201_paper/s0/sky130-flash-adc-3bit-pvt.rhs
+78 pg2k /workspace/race7_code/data/s0/pg2k.mtx /workspace/race7_code/data/s0/pg2k.rhs
+79 pg5k /workspace/race7_code/data/s0/pg5k.mtx /workspace/race7_code/data/s0/pg5k.rhs
+80 pg10k /workspace/race7_code/data/s0/pg10k.mtx /workspace/race7_code/data/s0/pg10k.rhs skip
+81 pg10k /workspace/race7_code/data/s0/pg10k.mtx /workspace/race7_code/data/s0/pg10k.rhs skip
+82 pg10k /workspace/race7_code/data/s0/pg10k.mtx /workspace/race7_code/data/s0/pg10k.rhs skip
+83 pg10k /workspace/race7_code/data/s0/pg10k.mtx /workspace/race7_code/data/s0/pg10k.rhs skip
+84 pg10k /workspace/race7_code/data/s0/pg10k.mtx /workspace/race7_code/data/s0/pg10k.rhs skip
+85 pg10k /workspace/race7_code/data/s0/pg10k.mtx /workspace/race7_code/data/s0/pg10k.rhs skip
+86 pg10k /workspace/race7_code/data/s0/pg10k.mtx /workspace/race7_code/data/s0/pg10k.rhs skip
+87 pg10k /workspace/race7_code/data/s0/pg10k.mtx /workspace/race7_code/data/s0/pg10k.rhs skip
+88 pg10k /workspace/race7_code/data/s0/pg10k.mtx /workspace/race7_code/data/s0/pg10k.rhs skip
+89 pg10k /workspace/race7_code/data/s0/pg10k.mtx /workspace/race7_code/data/s0/pg10k.rhs skip

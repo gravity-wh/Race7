@@ -1,0 +1,16 @@
+# 凭据（绝不入库）
+code/.eda_pw
+*.pem
+*.key
+
+# 构建/临时
+__pycache__/
+*.pyc
+*.ps
+*.aux
+*.log
+*.out
+paper/main.pdf.bak
+
+# 大文件
+*.mtx

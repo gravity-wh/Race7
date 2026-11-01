@@ -1,0 +1,318 @@
+% 03-section3.tex -- §3 完整版（直接 \input 进 main.tex 替换原 §3）
+% 需要 main.tex 加一行:  \usepackage{mathtools}
+%
+% 3.1 两个构造   3.2 引理3.1 因子扰动   3.3 引理3.2 主元地板
+% 3.4 (A1) 主元支配性（正例/反例）      3.5 命题3.3 压缩
+% 3.6 (A2) 量化地板 + 命题3.4 重算      3.7 定理3.5 二分性
+% 3.8 适用范围与失效模式
+
+\section{Structure: pivot floors and the dichotomy}\label{sec:structure}
+
+Throughout, $\norm{\cdot}$ denotes the spectral norm,
+$\kappa=\kappa_2(A)=\sigma_{\max}(A)/\sigma_{\min}(A)$, and
+$\rho=\norm{\abs{L}\abs{U}}_2/\norm{A}_2$.  The experiments of
+Section~\ref{sec:exp} report $\infty$-norm analogues; the two differ by at most a
+factor $\sqrt n$ and we do not distinguish them.
+
+\subsection{Two constructions at the same precision}
+
+Let $u\in(0,1)$ be the unit roundoff and $\gamma_k=ku/(1-ku)$.
+
+\begin{definition}[Factor constructions]\label{def:constructions}
+Let $A\in\mathbb{R}^{n\times n}$ be nonsingular and let $PAQ=LU$ be its
+factorization in exact arithmetic, with $L$ unit lower triangular and
+$\abs{L}\le1$ entrywise.
+\begin{enumerate}
+  \item \emph{Recompute}: $M_r=\tilde L\tilde U$, from Gaussian elimination with
+        partial pivoting carried out in precision $u$.
+  \item \emph{Compress}: $M_c=\hat L\hat U$ with
+        $\hat L=\operatorname{fl}_u(L)$, $\hat U=\operatorname{fl}_u(U)$.
+\end{enumerate}
+\end{definition}
+
+The constructions differ only in \emph{where} rounding is committed: compression
+rounds the finished factors once; recomputation rounds every intermediate update.
+
+\subsection{Perturbation of the factors}
+
+\begin{lemma}\label{lem:perturb}
+With $E_r=A-M_r$ and $E_c=A-M_c$,
+\begin{equation}
+  \abs{E_r}\le\gamma_{n}\abs{\tilde L}\abs{\tilde U},
+  \qquad
+  \abs{E_c}\le(2u+3u^2)\abs{L}\abs{U},
+\end{equation}
+hence
+\begin{equation}\label{eq:same-backward}
+  \norm{E_r}\le(1+O(u))\,\gamma_n\,\rho\norm{A},
+  \qquad
+  \norm{E_c}\le(2u+O(u^2))\,\rho\norm{A}.
+\end{equation}
+\end{lemma}
+
+\begin{proof}
+The first bound is the standard componentwise backward error of Gaussian
+elimination \cite{higham2002,ch2018}. For the second, write
+$L=\hat L+\delta L$, $U=\hat U+\delta U$ with $\abs{\delta L}\le u\abs{L}$ and
+$\abs{\delta U}\le u\abs{U}$ (round to nearest). Then
+\[
+  A=LU=(\hat L-\delta L)(\hat U-\delta U)
+   =\hat L\hat U-\delta L\,\hat U-\hat L\,\delta U+\delta L\,\delta U ,
+\]
+so $E_c=\delta L\,\hat U+\hat L\,\delta U-\delta L\,\delta U$ and
+$\abs{E_c}\le(2u+3u^2)\abs{L}\abs{U}$ after absorbing $(1+u)\le 1+O(u)$.
+\end{proof}
+
+\begin{remark}\label{rem:same}
+Lemma~\ref{lem:perturb} makes precise the sense in which the two constructions
+have the \emph{same} backward error: both are $O(u\rho\norm{A})$, and neither
+bound involves $\kappa$. Any difference in behaviour must therefore come from the
+\emph{direction} of $E$, not its magnitude.
+\end{remark}
+
+\subsection{The pivot floor}
+
+\begin{lemma}[Pivot floor]\label{lem:floor}
+The computed pivots of $M_r$ satisfy
+\begin{equation}\label{eq:floor}
+  \abs{\tilde u_{kk}-u_{kk}}\;\le\;\gamma_{k-1}\norm{U},
+  \qquad k=1,\dots,n .
+\end{equation}
+In particular, if $\abs{u_{kk}}\le\gamma_{k-1}\norm{U}$ the computed pivot is of
+the order of the noise level $\gamma_{k-1}\norm{U}$ and carries no information
+about $u_{kk}$.
+\end{lemma}
+
+\begin{proof}
+The $(k,k)$ entry after $k-1$ updates is
+$u_{kk}=a_{kk}-\sum_{j<k}l_{kj}u_{jk}$. In precision $u$ each of the $k-1$ terms
+contributes a rounding error bounded by $u\abs{l_{kj}}\abs{u_{jk}}\le u\norm{U}$,
+and the partial sums are themselves rounded, giving \eqref{eq:floor}.
+\end{proof}
+
+\begin{remark}[The floor is a many-update effect]\label{rem:fma}
+A single fused multiply-add rounds its exact result once, so a $2\times2$
+elimination commits \emph{relative} error and exhibits no floor. The floor
+requires $k\gg1$ updates whose intermediate magnitudes are large while the final
+value is small. We verified this numerically: for the family
+$U=\bigl(\begin{smallmatrix}1&t\\0&\varepsilon\end{smallmatrix}\bigr)$ with $n=2$,
+compression and recomputation agree in every printed digit for $t$ up to
+$10^{6}$, whereas the $n=48$ experiments of Figure~\ref{fig:inv} show saturation
+at $\kappa\approx u^{-1}$.
+\end{remark}
+
+\subsection{Pivot dominance}\label{sec:dominance}
+
+Lemma~\ref{lem:floor} bounds how \emph{small} a computed pivot can be---one
+direction only. Bounding $\norm{M^{-1}}$ requires relating pivots to singular
+values.
+
+\begin{definition}[Pivot dominance, (A1)]\label{def:A1}
+A family of factorizations satisfies (A1) with constant $c>0$ if
+\begin{equation}
+  \sigma_{\min}(LU)\;\ge\;c\,\min_{k}\abs{u_{kk}}
+  \qquad\text{for every }LU\text{ in the family.}
+\end{equation}
+\end{definition}
+
+\begin{proposition}[Sufficient condition]\label{prop:A1-suff}
+Let $U=V\Lambda V^{-1}$. Then
+\begin{equation}
+  \sigma_{\min}(LU)\;\ge\;\frac{\min_k\abs{u_{kk}}}{\kappa_2(V)\,\norm{L^{-1}}_2},
+\end{equation}
+so (A1) holds with $c^{-1}=\kappa_2(V)\norm{L^{-1}}_2$.
+\end{proposition}
+
+\begin{proof}
+$\sigma_{\min}(U)=\sigma_{\min}(V\Lambda V^{-1})\ge
+\sigma_{\min}(V)\min_k\abs{u_{kk}}\sigma_{\min}(V^{-1})
+=\min_k\abs{u_{kk}}/\kappa_2(V)$, and
+$\sigma_{\min}(LU)\ge\sigma_{\min}(L)\sigma_{\min}(U)$ with
+$\sigma_{\min}(L)=1/\norm{L^{-1}}_2$.
+\end{proof}
+
+\paragraph{Where (A1) holds.}
+Normal triangular factors ($\kappa_2(V)=1$); $M$-matrix factorizations with
+nonnegative factors, where $\abs{L}\abs{U}=\abs{A}$ and $\norm{L^{-1}}$ is
+controlled by diagonal dominance---this covers the circuit matrices of
+Section~\ref{sec:exp}, nine of which give $\rho=1$ exactly.
+
+\paragraph{Where (A1) fails.}
+For $U=\bigl(\begin{smallmatrix}1&t\\0&\varepsilon\end{smallmatrix}\bigr)$ with
+$t\gg1$ the eigenvalues are $1,\varepsilon$ but
+$\kappa_2(V)\asymp t$ and
+\[
+  \sigma_{\min}(U)=\frac{\varepsilon}{\sqrt{1+t^2}}
+  \;\approx\;\frac{\min_k\abs{u_{kk}}}{t},
+\]
+so (A1) fails with $c\approx t^{-1}$.  Numerically the ratio
+$\sigma_{\min}/\min_k\abs{u_{kk}}$ falls from $7.1\times10^{-1}$ at $t=1$ to
+$1.0\times10^{-6}$ at $t=10^{6}$, matching the prediction $1/\sqrt{1+t^2}$.
+
+\begin{remark}[The two failure modes coincide]\label{rem:coincide}
+The off-diagonal magnitude $t$ that destroys (A1) also raises the noise level
+$\gamma_n\norm{U}\approx\gamma_nt$ that creates the pivot floor. Hence when (A1)
+fails badly, the pivots are themselves sub-floor and \emph{no} low-precision
+factorization---compressed or recomputed---is usable. The dichotomy below is then
+vacuous rather than false; the matrix simply requires higher precision. This is
+the analytical counterpart of the experimental ``red zone''.
+\end{remark}
+
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{figures/fig7_compress_vs_recompute.pdf}
+  \caption{$\norm{M^{-1}}$ for compressed versus recomputed factors at the same
+  $u_q$. Compression (solid) tracks $\kappa$; recomputation (dotted) saturates at
+  $\approx1/(u\norm{U})$.}
+  \label{fig:inv}
+\end{figure}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{figures/fig8_dev_vs_kappa.pdf}
+  \caption{$\norm{AM^{-1}-I}$: compression diverges with $\kappa$, recomputation
+  is capped at $O(1/u_q)$. This is the quantity that Theorem~\ref{thm:dichotomy}
+  separates and Proposition~\ref{prop:recurrence} turns into a contraction rate.}
+  \label{fig:dev}
+\end{figure}
+
+\subsection{Compressed factors preserve the inverse norm}
+
+\begin{proposition}\label{prop:compress}
+Let $M_c$ be the compressed factorization and suppose $2u\rho\kappa<1$. Then
+\begin{equation}
+  \norm{M_c^{-1}}\;\le\;\frac{\kappa}{\norm{A}}\cdot\frac{1}{1-2u\rho\kappa},
+  \qquad
+  \norm{I-M_c^{-1}A}\;\le\;\frac{2u\rho\kappa}{1-2u\rho\kappa}.
+\end{equation}
+\end{proposition}
+
+\begin{proof}
+By Lemma~\ref{lem:perturb},
+$\norm{E_c}\le2u\rho\norm{A}=2u\rho\kappa\,\sigma_{\min}(A)$.
+Weyl's inequality gives
+$\sigma_{\min}(M_c)\ge\sigma_{\min}(A)-\norm{E_c}\ge\sigma_{\min}(A)(1-2u\rho\kappa)$,
+which yields the first bound since $\sigma_{\min}(A)=\norm{A}/\kappa$. For the
+second, $I-M_c^{-1}A=M_c^{-1}E_c$, so
+\[
+  \norm{M_c^{-1}E_c}\le\frac{\kappa}{\norm{A}(1-2u\rho\kappa)}\cdot2u\rho\norm{A}
+  =\frac{2u\rho\kappa}{1-2u\rho\kappa}. \qedhere
+\]
+\end{proof}
+
+\begin{remark}
+Proposition~\ref{prop:compress} is \emph{unconditional}: it uses only Weyl.
+Compression therefore preserves the small singular values exactly when
+$u\rho\kappa\ll1$---the regime in which stationary refinement is expected to work.
+\end{remark}
+
+\subsection{Recomputed factors bound the preconditioned deviation}
+
+Weyl gives the same lower bound for $M_r$, since $\norm{E_r}$ and
+$\norm{E_c}$ are the same size. The distinguishing feature of recomputation is
+the \emph{upper} side: the floor of Lemma~\ref{lem:floor} prevents
+$\sigma_{\min}(M_r)$ from collapsing below the noise level.
+
+\begin{definition}[Quantization floor, (A2)]\label{def:A2}
+The recomputed factorization satisfies (A2) with constant $c'>0$ if
+$\sigma_{\min}(M_r)\ge c'\,u\norm{U}$.
+\end{definition}
+
+\begin{remark}
+(A2) is the analytical form of the saturation in Figure~\ref{fig:inv}:
+$\norm{M_r^{-1}}$ stops growing at $\approx1/(u\norm{U})$. It is a
+\emph{generic} statement---rounding errors do not conspire to annihilate the
+smallest singular direction---rather than a theorem; adversarial alignments
+violate it, and then (A1) fails too by Remark~\ref{rem:coincide}.
+\end{remark}
+
+\begin{proposition}\label{prop:recompute}
+Under (A2),
+\begin{equation}
+  \norm{AM_r^{-1}-I}=\norm{E_rM_r^{-1}}
+  \;\le\;\frac{\gamma_n}{u}\cdot\frac{\rho\norm{A}}{c'\norm{U}}
+  \;\approx\;\frac{n\,\rho\,\norm{L}}{c'},
+\end{equation}
+which is independent of $\kappa$ and of $u$.
+\end{proposition}
+
+\begin{proof}
+$AM_r^{-1}-I=(A-M_r)M_r^{-1}=E_rM_r^{-1}$, so
+$\norm{E_rM_r^{-1}}\le\norm{E_r}\norm{M_r^{-1}}
+\le(\gamma_n\rho\norm{A})(c'u\norm{U})^{-1}
+=\frac{\gamma_n}{u}\cdot\frac{\rho\norm{A}}{c'\norm{U}}$.
+Since $\norm{A}=\norm{LU}\le\norm{L}\norm{U}$ and
+$\gamma_n/u=n/(1-nu)$, the stated form follows.
+\end{proof}
+
+\subsection{The dichotomy}
+
+\begin{theorem}[Dichotomy]\label{thm:dichotomy}
+Let $M_c$ and $M_r$ be the two constructions at the same $u$.
+\begin{enumerate}
+  \item If $4u\rho\kappa<1$ then $\norm{I-M_c^{-1}A}<1$: compression is a
+        contraction for stationary refinement, with rate $\Theta(u\rho\kappa)$.
+  \item Under (A2), $\norm{AM_r^{-1}-I}\le n\rho\norm{L}/c'$, a constant
+        independent of $\kappa$ and of $u$: recomputation yields a bounded
+        preconditioner, and GMRES on $AM_r^{-1}=I+F$ converges in a number of
+        iterations governed by $\norm{F}$ rather than by $\kappa$.
+  \item Conversely, under (A1),
+        $\norm{I-M_r^{-1}A}\gtrsim\norm{L}/c$ whenever the smallest pivot is
+        sub-floor; in that regime recomputation is unusable for stationary
+        refinement at \emph{every} $\kappa$, while compression still satisfies
+        (1) as long as $\kappa\lesssim1/(u\rho)$.
+\end{enumerate}
+\end{theorem}
+
+\begin{proof}
+(1) follows from Proposition~\ref{prop:compress}: the bound is $<1$ iff
+$4u\rho\kappa<1$, and the rate is the bound itself.
+(2) is Proposition~\ref{prop:recompute}.
+(3): $M_r^{-1}A=I-M_r^{-1}E_r$. Under (A1) and a sub-floor pivot,
+$\sigma_{\min}(M_r)\approx c\,u\norm{U}$, so
+$\norm{M_r^{-1}}\approx1/(cu\norm{U})$ while
+$\norm{E_r}\approx\gamma_n\rho\norm{A}\approx\gamma_n\norm{L}\norm{U}$; the
+product is $\approx(\gamma_n/u)\norm{L}/c\approx n\norm{L}/c\gg1$ when
+$\norm{L}\gg1$. Compression is unaffected because its pivots are preserved
+relatively (Lemma~\ref{lem:perturb} and Proposition~\ref{prop:compress}).
+\end{proof}
+
+\begin{corollary}[The two feasible sets]\label{cor:sets}
+For a fixed residual target, the two refinement schemes require structurally
+different factors:
+\[
+  \text{stationary refinement: } \norm{I-M^{-1}A}<1
+  \ \Longrightarrow\ \text{compressed factors, } \kappa\lesssim\frac{1}{u\rho};
+\]
+\[
+  \text{GMRES-based refinement: } \norm{AM^{-1}-I}=O(1)
+  \ \Longrightarrow\ \text{recomputed factors, no }\kappa\text{ restriction
+  from the factorization.}
+\]
+\end{corollary}
+
+\subsection{Scope, constants, and failure modes}
+
+\paragraph{The constants are loose, the scaling is not.}
+Proposition~\ref{prop:compress} places the stationary-refinement cliff at
+$\kappa\approx1/(4u\rho)$; the measurements of Section~\ref{sec:exp} put it at
+$\kappa\approx6/u$ for $\rho\approx1$, a factor $24$ more generous. This is
+expected: the bound takes the worst case over error directions, whereas the
+actual iteration matrix has a spectrum clustered near zero except in a few
+directions.
+
+\paragraph{How to check (A1) and (A2) after the fact.}
+Both are properties of the \emph{computed} factorization and can be measured
+cheaply: (A1) by comparing $\sigma_{\min}(M)$ with $\min_k\abs{u_{kk}}$, and
+(A2) by comparing $\sigma_{\min}(M_r)$ with $u\norm{U}$. We recommend reporting
+both ratios next to $\rho$.
+
+\paragraph{Relation to earlier analyses.}
+Carson and Higham \cite{ch2018} analyse the \emph{iteration} and obtain
+$\kappa u_f\ll1$ for stationary refinement; Higham and Mary \cite{hm2022} give
+the five-precision framework and the condition
+$\kappa^2u_f^2(u_g+\kappa u_p)\ll1$ for GMRES-based refinement. Our result is
+orthogonal: we hold the algorithm fixed and vary the \emph{construction} of the
+factors, showing that the two conditions above are attained by structurally
+different objects and that neither can be substituted for the other.

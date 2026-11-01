@@ -1,0 +1,145 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="470" viewBox="0 0 920 470" font-family="'Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="80" y="27" font-size="16" font-weight="600" fill="#0f172a">前向误差的断崖：低精度配置在越过边界后不再收敛（n=64，5 seeds 中位）</text>
+<line x1="80.0" y1="48" x2="80.0" y2="408" stroke="#eef2f7"/>
+<text x="80.0" y="428" font-size="12" fill="#475569" text-anchor="middle">1</text>
+<line x1="114.4" y1="48" x2="114.4" y2="408" stroke="#eef2f7"/>
+<text x="114.4" y="428" font-size="12" fill="#475569" text-anchor="middle">1e1</text>
+<line x1="148.9" y1="48" x2="148.9" y2="408" stroke="#eef2f7"/>
+<text x="148.9" y="428" font-size="12" fill="#475569" text-anchor="middle">1e2</text>
+<line x1="183.3" y1="48" x2="183.3" y2="408" stroke="#eef2f7"/>
+<text x="183.3" y="428" font-size="12" fill="#475569" text-anchor="middle">1e3</text>
+<line x1="217.8" y1="48" x2="217.8" y2="408" stroke="#eef2f7"/>
+<text x="217.8" y="428" font-size="12" fill="#475569" text-anchor="middle">1e4</text>
+<line x1="252.2" y1="48" x2="252.2" y2="408" stroke="#eef2f7"/>
+<text x="252.2" y="428" font-size="12" fill="#475569" text-anchor="middle">1e5</text>
+<line x1="286.7" y1="48" x2="286.7" y2="408" stroke="#eef2f7"/>
+<text x="286.7" y="428" font-size="12" fill="#475569" text-anchor="middle">1e6</text>
+<line x1="321.1" y1="48" x2="321.1" y2="408" stroke="#eef2f7"/>
+<text x="321.1" y="428" font-size="12" fill="#475569" text-anchor="middle">1e7</text>
+<line x1="355.6" y1="48" x2="355.6" y2="408" stroke="#eef2f7"/>
+<text x="355.6" y="428" font-size="12" fill="#475569" text-anchor="middle">1e8</text>
+<line x1="390.0" y1="48" x2="390.0" y2="408" stroke="#eef2f7"/>
+<text x="390.0" y="428" font-size="12" fill="#475569" text-anchor="middle">1e9</text>
+<line x1="424.4" y1="48" x2="424.4" y2="408" stroke="#eef2f7"/>
+<text x="424.4" y="428" font-size="12" fill="#475569" text-anchor="middle">1e10</text>
+<line x1="458.9" y1="48" x2="458.9" y2="408" stroke="#eef2f7"/>
+<text x="458.9" y="428" font-size="12" fill="#475569" text-anchor="middle">1e11</text>
+<line x1="493.3" y1="48" x2="493.3" y2="408" stroke="#eef2f7"/>
+<text x="493.3" y="428" font-size="12" fill="#475569" text-anchor="middle">1e12</text>
+<line x1="527.8" y1="48" x2="527.8" y2="408" stroke="#eef2f7"/>
+<text x="527.8" y="428" font-size="12" fill="#475569" text-anchor="middle">1e13</text>
+<line x1="562.2" y1="48" x2="562.2" y2="408" stroke="#eef2f7"/>
+<text x="562.2" y="428" font-size="12" fill="#475569" text-anchor="middle">1e14</text>
+<line x1="596.7" y1="48" x2="596.7" y2="408" stroke="#eef2f7"/>
+<text x="596.7" y="428" font-size="12" fill="#475569" text-anchor="middle">1e15</text>
+<line x1="631.1" y1="48" x2="631.1" y2="408" stroke="#eef2f7"/>
+<text x="631.1" y="428" font-size="12" fill="#475569" text-anchor="middle">1e16</text>
+<line x1="665.6" y1="48" x2="665.6" y2="408" stroke="#eef2f7"/>
+<text x="665.6" y="428" font-size="12" fill="#475569" text-anchor="middle">1e17</text>
+<line x1="700.0" y1="48" x2="700.0" y2="408" stroke="#eef2f7"/>
+<text x="700.0" y="428" font-size="12" fill="#475569" text-anchor="middle">1e18</text>
+<line x1="80" y1="372.0" x2="700" y2="372.0" stroke="#eef2f7"/>
+<text x="72" y="376.0" font-size="12" fill="#475569" text-anchor="end">1e-16</text>
+<line x1="80" y1="300.0" x2="700" y2="300.0" stroke="#eef2f7"/>
+<text x="72" y="304.0" font-size="12" fill="#475569" text-anchor="end">1e-12</text>
+<line x1="80" y1="228.0" x2="700" y2="228.0" stroke="#eef2f7"/>
+<text x="72" y="232.0" font-size="12" fill="#475569" text-anchor="end">1e-08</text>
+<line x1="80" y1="156.0" x2="700" y2="156.0" stroke="#eef2f7"/>
+<text x="72" y="160.0" font-size="12" fill="#475569" text-anchor="end">1e-04</text>
+<line x1="80" y1="84.0" x2="700" y2="84.0" stroke="#eef2f7"/>
+<text x="72" y="88.0" font-size="12" fill="#475569" text-anchor="end">1</text>
+<rect x="80" y="48" width="620" height="360" fill="none" stroke="#94a3b8"/>
+<path d="M80.0,371.3 L700.0,47.3" fill="none" stroke="#cbd5e1" stroke-width="1.8" stroke-dasharray="6,4" stroke-linejoin="round"/>
+<circle cx="80.0" cy="371.3" r="3.1" fill="#fff" stroke="#cbd5e1" stroke-width="1.8"/>
+<circle cx="700.0" cy="47.3" r="3.1" fill="#fff" stroke="#cbd5e1" stroke-width="1.8"/>
+<path d="M80.0,363.2 L148.9,343.3 L217.8,311.9 L286.7,275.9 L321.1,262.1 L355.6,241.1 L390.0,56.2 L424.4,69.2 L493.3,59.5 L562.2,60.4" fill="none" stroke="#dc2626" stroke-width="2.2" stroke-linejoin="round"/>
+<circle cx="80.0" cy="363.2" r="3.1" fill="#fff" stroke="#dc2626" stroke-width="1.8"/>
+<circle cx="148.9" cy="343.3" r="3.1" fill="#fff" stroke="#dc2626" stroke-width="1.8"/>
+<circle cx="217.8" cy="311.9" r="3.1" fill="#fff" stroke="#dc2626" stroke-width="1.8"/>
+<circle cx="286.7" cy="275.9" r="3.1" fill="#fff" stroke="#dc2626" stroke-width="1.8"/>
+<circle cx="321.1" cy="262.1" r="3.1" fill="#fff" stroke="#dc2626" stroke-width="1.8"/>
+<circle cx="355.6" cy="241.1" r="3.1" fill="#fff" stroke="#dc2626" stroke-width="1.8"/>
+<circle cx="390.0" cy="56.2" r="3.1" fill="#fff" stroke="#dc2626" stroke-width="1.8"/>
+<circle cx="424.4" cy="69.2" r="3.1" fill="#fff" stroke="#dc2626" stroke-width="1.8"/>
+<circle cx="493.3" cy="59.5" r="3.1" fill="#fff" stroke="#dc2626" stroke-width="1.8"/>
+<circle cx="562.2" cy="60.4" r="3.1" fill="#fff" stroke="#dc2626" stroke-width="1.8"/>
+<path d="M80.0,363.2 L148.9,343.0 L217.8,312.6 L286.7,280.3 L321.1,121.1 L355.6,71.6 L390.0,48.0" fill="none" stroke="#059669" stroke-width="2.2" stroke-dasharray="2,3" stroke-linejoin="round"/>
+<circle cx="80.0" cy="363.2" r="3.1" fill="#fff" stroke="#059669" stroke-width="1.8"/>
+<circle cx="148.9" cy="343.0" r="3.1" fill="#fff" stroke="#059669" stroke-width="1.8"/>
+<circle cx="217.8" cy="312.6" r="3.1" fill="#fff" stroke="#059669" stroke-width="1.8"/>
+<circle cx="286.7" cy="280.3" r="3.1" fill="#fff" stroke="#059669" stroke-width="1.8"/>
+<circle cx="321.1" cy="121.1" r="3.1" fill="#fff" stroke="#059669" stroke-width="1.8"/>
+<circle cx="355.6" cy="71.6" r="3.1" fill="#fff" stroke="#059669" stroke-width="1.8"/>
+<circle cx="390.0" cy="48.0" r="3.1" fill="#fff" stroke="#059669" stroke-width="1.8"/>
+<path d="M80.0,357.8 L148.9,345.0 L217.8,313.3 L286.7,279.1 L321.1,264.3 L355.6,244.4 L390.0,228.9 L424.4,210.5 L493.3,57.7 L562.2,48.0" fill="none" stroke="#d97706" stroke-width="2.2" stroke-dasharray="5,3" stroke-linejoin="round"/>
+<circle cx="80.0" cy="357.8" r="3.1" fill="#fff" stroke="#d97706" stroke-width="1.8"/>
+<circle cx="148.9" cy="345.0" r="3.1" fill="#fff" stroke="#d97706" stroke-width="1.8"/>
+<circle cx="217.8" cy="313.3" r="3.1" fill="#fff" stroke="#d97706" stroke-width="1.8"/>
+<circle cx="286.7" cy="279.1" r="3.1" fill="#fff" stroke="#d97706" stroke-width="1.8"/>
+<circle cx="321.1" cy="264.3" r="3.1" fill="#fff" stroke="#d97706" stroke-width="1.8"/>
+<circle cx="355.6" cy="244.4" r="3.1" fill="#fff" stroke="#d97706" stroke-width="1.8"/>
+<circle cx="390.0" cy="228.9" r="3.1" fill="#fff" stroke="#d97706" stroke-width="1.8"/>
+<circle cx="424.4" cy="210.5" r="3.1" fill="#fff" stroke="#d97706" stroke-width="1.8"/>
+<circle cx="493.3" cy="57.7" r="3.1" fill="#fff" stroke="#d97706" stroke-width="1.8"/>
+<circle cx="562.2" cy="48.0" r="3.1" fill="#fff" stroke="#d97706" stroke-width="1.8"/>
+<path d="M80.0,360.3 L148.9,343.2 L217.8,117.0 L286.7,61.5 L321.1,48.7 L355.6,60.6 L390.0,48.0" fill="none" stroke="#7c3aed" stroke-width="2.2" stroke-dasharray="4,2" stroke-linejoin="round"/>
+<circle cx="80.0" cy="360.3" r="3.1" fill="#fff" stroke="#7c3aed" stroke-width="1.8"/>
+<circle cx="148.9" cy="343.2" r="3.1" fill="#fff" stroke="#7c3aed" stroke-width="1.8"/>
+<circle cx="217.8" cy="117.0" r="3.1" fill="#fff" stroke="#7c3aed" stroke-width="1.8"/>
+<circle cx="286.7" cy="61.5" r="3.1" fill="#fff" stroke="#7c3aed" stroke-width="1.8"/>
+<circle cx="321.1" cy="48.7" r="3.1" fill="#fff" stroke="#7c3aed" stroke-width="1.8"/>
+<circle cx="355.6" cy="60.6" r="3.1" fill="#fff" stroke="#7c3aed" stroke-width="1.8"/>
+<circle cx="390.0" cy="48.0" r="3.1" fill="#fff" stroke="#7c3aed" stroke-width="1.8"/>
+<path d="M80.0,361.6 L148.9,344.4 L217.8,311.9 L286.7,276.7 L321.1,265.1 L355.6,244.3 L390.0,231.9 L424.4,208.2 L493.3,179.5 L562.2,137.8" fill="none" stroke="#0891b2" stroke-width="2.2" stroke-dasharray="1,2" stroke-linejoin="round"/>
+<circle cx="80.0" cy="361.6" r="3.1" fill="#fff" stroke="#0891b2" stroke-width="1.8"/>
+<circle cx="148.9" cy="344.4" r="3.1" fill="#fff" stroke="#0891b2" stroke-width="1.8"/>
+<circle cx="217.8" cy="311.9" r="3.1" fill="#fff" stroke="#0891b2" stroke-width="1.8"/>
+<circle cx="286.7" cy="276.7" r="3.1" fill="#fff" stroke="#0891b2" stroke-width="1.8"/>
+<circle cx="321.1" cy="265.1" r="3.1" fill="#fff" stroke="#0891b2" stroke-width="1.8"/>
+<circle cx="355.6" cy="244.3" r="3.1" fill="#fff" stroke="#0891b2" stroke-width="1.8"/>
+<circle cx="390.0" cy="231.9" r="3.1" fill="#fff" stroke="#0891b2" stroke-width="1.8"/>
+<circle cx="424.4" cy="208.2" r="3.1" fill="#fff" stroke="#0891b2" stroke-width="1.8"/>
+<circle cx="493.3" cy="179.5" r="3.1" fill="#fff" stroke="#0891b2" stroke-width="1.8"/>
+<circle cx="562.2" cy="137.8" r="3.1" fill="#fff" stroke="#0891b2" stroke-width="1.8"/>
+<path d="M80.0,364.0 L148.9,344.7 L217.8,313.6 L286.7,280.2 L321.1,264.0 L355.6,250.7 L390.0,228.2 L424.4,209.2 L493.3,180.1 L562.2,140.1" fill="none" stroke="#be185d" stroke-width="2.2" stroke-linejoin="round"/>
+<circle cx="80.0" cy="364.0" r="3.1" fill="#fff" stroke="#be185d" stroke-width="1.8"/>
+<circle cx="148.9" cy="344.7" r="3.1" fill="#fff" stroke="#be185d" stroke-width="1.8"/>
+<circle cx="217.8" cy="313.6" r="3.1" fill="#fff" stroke="#be185d" stroke-width="1.8"/>
+<circle cx="286.7" cy="280.2" r="3.1" fill="#fff" stroke="#be185d" stroke-width="1.8"/>
+<circle cx="321.1" cy="264.0" r="3.1" fill="#fff" stroke="#be185d" stroke-width="1.8"/>
+<circle cx="355.6" cy="250.7" r="3.1" fill="#fff" stroke="#be185d" stroke-width="1.8"/>
+<circle cx="390.0" cy="228.2" r="3.1" fill="#fff" stroke="#be185d" stroke-width="1.8"/>
+<circle cx="424.4" cy="209.2" r="3.1" fill="#fff" stroke="#be185d" stroke-width="1.8"/>
+<circle cx="493.3" cy="180.1" r="3.1" fill="#fff" stroke="#be185d" stroke-width="1.8"/>
+<circle cx="562.2" cy="140.1" r="3.1" fill="#fff" stroke="#be185d" stroke-width="1.8"/>
+<path d="M80.0,363.5 L148.9,343.5 L217.8,312.6 L286.7,282.7 L321.1,262.6 L355.6,246.5 L390.0,228.1 L424.4,210.1 L493.3,176.5 L562.2,133.1" fill="none" stroke="#4d7c0f" stroke-width="2.2" stroke-dasharray="2,3" stroke-linejoin="round"/>
+<circle cx="80.0" cy="363.5" r="3.1" fill="#fff" stroke="#4d7c0f" stroke-width="1.8"/>
+<circle cx="148.9" cy="343.5" r="3.1" fill="#fff" stroke="#4d7c0f" stroke-width="1.8"/>
+<circle cx="217.8" cy="312.6" r="3.1" fill="#fff" stroke="#4d7c0f" stroke-width="1.8"/>
+<circle cx="286.7" cy="282.7" r="3.1" fill="#fff" stroke="#4d7c0f" stroke-width="1.8"/>
+<circle cx="321.1" cy="262.6" r="3.1" fill="#fff" stroke="#4d7c0f" stroke-width="1.8"/>
+<circle cx="355.6" cy="246.5" r="3.1" fill="#fff" stroke="#4d7c0f" stroke-width="1.8"/>
+<circle cx="390.0" cy="228.1" r="3.1" fill="#fff" stroke="#4d7c0f" stroke-width="1.8"/>
+<circle cx="424.4" cy="210.1" r="3.1" fill="#fff" stroke="#4d7c0f" stroke-width="1.8"/>
+<circle cx="493.3" cy="176.5" r="3.1" fill="#fff" stroke="#4d7c0f" stroke-width="1.8"/>
+<circle cx="562.2" cy="133.1" r="3.1" fill="#fff" stroke="#4d7c0f" stroke-width="1.8"/>
+<line x1="718" y1="50" x2="738" y2="50" stroke="#cbd5e1" stroke-width="1.8"/>
+<text x="745" y="54" font-size="12" fill="#334155">FP64 极限 ≈ κ·u</text>
+<line x1="718" y1="71" x2="738" y2="71" stroke="#dc2626" stroke-width="2.2"/>
+<text x="745" y="75" font-size="12" fill="#334155">FP32 分解 + 定常 IR</text>
+<line x1="718" y1="92" x2="738" y2="92" stroke="#059669" stroke-width="2.2"/>
+<text x="745" y="96" font-size="12" fill="#334155">因子存 11 位 + 定常 IR</text>
+<line x1="718" y1="113" x2="738" y2="113" stroke="#d97706" stroke-width="2.2"/>
+<text x="745" y="117" font-size="12" fill="#334155">因子存 11 位 + GMRES-IR</text>
+<line x1="718" y1="134" x2="738" y2="134" stroke="#7c3aed" stroke-width="2.2"/>
+<text x="745" y="138" font-size="12" fill="#334155">11 位下分解 + 定常 IR</text>
+<line x1="718" y1="155" x2="738" y2="155" stroke="#0891b2" stroke-width="2.2"/>
+<text x="745" y="159" font-size="12" fill="#334155">11 位下分解 + GMRES-IR</text>
+<line x1="718" y1="176" x2="738" y2="176" stroke="#be185d" stroke-width="2.2"/>
+<text x="745" y="180" font-size="12" fill="#334155">FP32 分解 + GMRES-IR</text>
+<line x1="718" y1="197" x2="738" y2="197" stroke="#4d7c0f" stroke-width="2.2"/>
+<text x="745" y="201" font-size="12" fill="#334155">因子存 FP32 + 定常 IR</text>
+<text x="390.0" y="454" font-size="13" fill="#334155" text-anchor="middle">κ₂(A)</text>
+<text x="20" y="228.0" font-size="13" fill="#334155" text-anchor="middle" transform="rotate(-90 20 228.0)">前向相对误差 FE</text>
+</svg>

@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1002" height="434" viewBox="0 0 1002 434" font-family="'Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="292" y="27" font-size="16" font-weight="600" fill="#0f172a">能力边界：仍能把前向误差压回 FP64 水平的最高条件数（n=64，5 seeds，≥60% 成功）</text>
+<line x1="339.3" y1="52" x2="339.3" y2="370" stroke="#eef2f7"/>
+<text x="339.3" y="390" font-size="12" fill="#475569" text-anchor="middle">10^1</text>
+<line x1="378.8" y1="52" x2="378.8" y2="370" stroke="#eef2f7"/>
+<text x="378.8" y="390" font-size="12" fill="#475569" text-anchor="middle">10^2</text>
+<line x1="418.2" y1="52" x2="418.2" y2="370" stroke="#eef2f7"/>
+<text x="418.2" y="390" font-size="12" fill="#475569" text-anchor="middle">10^3</text>
+<line x1="457.6" y1="52" x2="457.6" y2="370" stroke="#eef2f7"/>
+<text x="457.6" y="390" font-size="12" fill="#475569" text-anchor="middle">10^4</text>
+<line x1="497.1" y1="52" x2="497.1" y2="370" stroke="#eef2f7"/>
+<text x="497.1" y="390" font-size="12" fill="#475569" text-anchor="middle">10^5</text>
+<line x1="536.5" y1="52" x2="536.5" y2="370" stroke="#eef2f7"/>
+<text x="536.5" y="390" font-size="12" fill="#475569" text-anchor="middle">10^6</text>
+<line x1="575.9" y1="52" x2="575.9" y2="370" stroke="#eef2f7"/>
+<text x="575.9" y="390" font-size="12" fill="#475569" text-anchor="middle">10^7</text>
+<line x1="615.4" y1="52" x2="615.4" y2="370" stroke="#eef2f7"/>
+<text x="615.4" y="390" font-size="12" fill="#475569" text-anchor="middle">10^8</text>
+<line x1="654.8" y1="52" x2="654.8" y2="370" stroke="#eef2f7"/>
+<text x="654.8" y="390" font-size="12" fill="#475569" text-anchor="middle">10^9</text>
+<line x1="694.3" y1="52" x2="694.3" y2="370" stroke="#eef2f7"/>
+<text x="694.3" y="390" font-size="12" fill="#475569" text-anchor="middle">10^10</text>
+<line x1="733.7" y1="52" x2="733.7" y2="370" stroke="#eef2f7"/>
+<text x="733.7" y="390" font-size="12" fill="#475569" text-anchor="middle">10^11</text>
+<line x1="773.1" y1="52" x2="773.1" y2="370" stroke="#eef2f7"/>
+<text x="773.1" y="390" font-size="12" fill="#475569" text-anchor="middle">10^12</text>
+<line x1="812.6" y1="52" x2="812.6" y2="370" stroke="#eef2f7"/>
+<text x="812.6" y="390" font-size="12" fill="#475569" text-anchor="middle">10^13</text>
+<line x1="852.0" y1="52" x2="852.0" y2="370" stroke="#eef2f7"/>
+<text x="852.0" y="390" font-size="12" fill="#475569" text-anchor="middle">10^14</text>
+<line x1="292" y1="52" x2="292" y2="370" stroke="#94a3b8"/>
+<rect x="292" y="56" width="560.0" height="22" fill="#0891b2" opacity="0.88" rx="2"/>
+<path d="M854.0,67.0 l10,-6 l0,12 z" fill="#0891b2"/>
+<text x="282" y="73" font-size="12" fill="#1e293b" text-anchor="end">FP64 分解 → 因子存 FP32 + IR</text>
+<text x="868.0" y="73" font-size="11" fill="#475569">≥ 1e14</text>
+<rect x="292" y="90" width="560.0" height="22" fill="#d97706" opacity="0.88" rx="2"/>
+<path d="M854.0,101.0 l10,-6 l0,12 z" fill="#d97706"/>
+<text x="282" y="107" font-size="12" fill="#1e293b" text-anchor="end">11 位下分解 + GMRES-IR</text>
+<text x="868.0" y="107" font-size="11" fill="#475569">≥ 1e14</text>
+<rect x="292" y="124" width="560.0" height="22" fill="#2563eb" opacity="0.88" rx="2"/>
+<path d="M854.0,135.0 l10,-6 l0,12 z" fill="#2563eb"/>
+<text x="282" y="141" font-size="12" fill="#1e293b" text-anchor="end">FP32 分解 + GMRES-IR</text>
+<text x="868.0" y="141" font-size="11" fill="#475569">≥ 1e14</text>
+<rect x="292" y="158" width="402.3" height="22" fill="#d97706" opacity="0.88" rx="2"/>
+<text x="282" y="175" font-size="12" fill="#1e293b" text-anchor="end">因子存 11 位 + GMRES-IR</text>
+<text x="700.3" y="175" font-size="11" fill="#475569">1e10</text>
+<rect x="292" y="192" width="323.4" height="22" fill="#2563eb" opacity="0.88" rx="2"/>
+<text x="282" y="209" font-size="12" fill="#1e293b" text-anchor="end">FP32 分解 + 定常 IR</text>
+<text x="621.4" y="209" font-size="11" fill="#475569">1e8</text>
+<rect x="292" y="226" width="323.4" height="22" fill="#2563eb" opacity="0.88" rx="2"/>
+<text x="282" y="243" font-size="12" fill="#1e293b" text-anchor="end">FP32 分解 + FP32 求解 + IR</text>
+<text x="621.4" y="243" font-size="11" fill="#475569">1e8</text>
+<rect x="292" y="260" width="244.5" height="22" fill="#d97706" opacity="0.88" rx="2"/>
+<text x="282" y="277" font-size="12" fill="#1e293b" text-anchor="end">FP64 分解 → 因子存 11 位 + IR</text>
+<text x="542.5" y="277" font-size="11" fill="#475569">1e6</text>
+<rect x="292" y="294" width="86.8" height="22" fill="#d97706" opacity="0.88" rx="2"/>
+<text x="282" y="311" font-size="12" fill="#1e293b" text-anchor="end">11 位下分解 + 定常 IR</text>
+<text x="384.8" y="311" font-size="11" fill="#475569">1e2</text>
+<rect x="292" y="328" width="7.9" height="22" fill="#94a3b8" opacity="0.88" rx="2"/>
+<text x="282" y="345" font-size="12" fill="#1e293b" text-anchor="end">纯 FP32 求解（无精化）</text>
+<text x="305.9" y="345" font-size="11" fill="#475569">1e0</text>
+<text x="572.0" y="416" font-size="13" fill="#334155" text-anchor="middle">κ₂(A) 上限</text>
+</svg>

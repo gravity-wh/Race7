@@ -1,0 +1,245 @@
+% 05-section6.tex -- §6 实验（可投稿结构）
+% 依赖：03/04/05 节定义的标签；图 fig1/fig2 在本节首次出现。
+
+\section{Experiments}\label{sec:exp}
+
+We ask three questions in order: (i) where are the phase boundaries of
+Theorem~\ref{thm:dichotomy} located, (ii) does the pivot-floor mechanism explain
+them, and (iii) does the resulting rule transfer to circuit-scale matrices and to
+two different hardware stacks.
+
+\subsection{Setup}
+
+\paragraph{Precision emulator.}
+All dense experiments use a pure-Python emulator that rounds \emph{every}
+multiply-add to $p$ significant bits. Since $a\cdot b$ is exact in double for
+$p\le27$, the operation $\mathrm{round}_p(a\cdot b+c)$ models a single-rounded
+FMA, with no hidden extended precision. This gives direct control over the three
+slots $(u_f,u_t,u_r)$ that a BLAS call cannot separate.
+
+\paragraph{Matrix families.}
+Condition-number-controlled matrices $A=U\Sigma V^{\top}$ with log-spaced
+singular values (orthonormal factors from two-pass modified Gram--Schmidt), plus
+1-D and 2-D Laplacians, diagonally dominant matrices, MNA-like sparse matrices,
+and Wilkinson's growth example.
+
+\paragraph{Protocol.}
+$n=64$ unless stated; eleven variants $\times$ ten condition numbers
+$\kappa\in\{1,10^{2},\dots,10^{14}\}$ $\times$ five seeds; spot checks at
+$n=32,128$ and a banded $n=576$. The eleven variants differ only in
+$(u_f,u_t,u_r)$ and in whether the factors are compressed or recomputed.
+
+\paragraph{Circuit matrices.}
+Thirteen matrices from the SuiteSparse circuit collection, factorized with KLU
+under BTF with AMD within blocks. Their order ranges from $4{,}960$ to
+$682{,}712$ and their sparsity from $0.08\%$ to $0.4\%$.
+
+\paragraph{Metrics.}
+\emph{Forward:} $\mathrm{FE}/\mathrm{FE}_{64}$, the ratio of the computed forward
+error to that of a pure FP64 solve, so that a value near $1$ means ``as accurate
+as FP64''. \emph{Backward:} the standard relative residual
+$\norm{r}/(\norm{A}\norm{\hat x}+\norm{b})$. \emph{Cost:} FP64-equivalent flops
+with $s_{32}=2$ and $s_{11}=8$ unless a measured value is quoted.
+
+\subsection{Where the phase boundaries are}
+
+\begin{table}[t]
+  \centering
+  \small
+  \caption{Forward-error ratio $\mathrm{FE}/\mathrm{FE}_{64}$ (median of five
+  seeds, $n=64$). Values near $1$ mean FP64 accuracy is recovered; values above
+  $10^{5}$ mean the refinement diverged.}
+  \label{tab:variants}
+  \begin{tabular}{lrrrrrrr}
+    \toprule
+    variant & $10^{2}$ & $10^{4}$ & $10^{6}$ & $10^{8}$ & $10^{9}$ & $10^{10}$ & $10^{12}$ \\
+    \midrule
+    FP32, no refinement      & $2.3{\cdot}10^{8}$ & $2.5{\cdot}10^{8}$ & $1.4{\cdot}10^{8}$ & $1.7{\cdot}10^{8}$ & $4.9{\cdot}10^{8}$ & $5.4{\cdot}10^{7}$ & $2.0{\cdot}10^{6}$ \\
+    FP32 + stationary        & $0.84$ & $1.0$ & $1.6$ & $2.0$ & $7.5{\cdot}10^{9}$ & $9.0{\cdot}10^{7}$ & $6.3{\cdot}10^{6}$ \\
+    FP32 + GMRES             & $0.70$ & $1.1$ & $1.2$ & $0.69$ & $1.8$ & $1.2$ & $1.7$ \\
+    11-bit recompute + IR    & $0.66$ & $1.5{\cdot}10^{11}$ & $1.7{\cdot}10^{12}$ & $3.1{\cdot}10^{10}$ & $2.1{\cdot}10^{11}$ & $2.3{\cdot}10^{8}$ & $2.7{\cdot}10^{6}$ \\
+    11-bit recompute + GMRES & $0.86$ & $1.3$ & $1.6$ & $1.4$ & $1.4$ & $1.4$ & $1.7$ \\
+    11-bit compress + IR     & $0.87$ & $0.92$ & $1.0$ & $7.3{\cdot}10^{9}$ & $3.7{\cdot}10^{12}$ & $9.6{\cdot}10^{13}$ & $9.1{\cdot}10^{18}$ \\
+    11-bit compress + GMRES  & $0.72$ & $1.2$ & $1.2$ & $1.3$ & $1.2$ & $1.2$ & $1.3{\cdot}10^{7}$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Table~\ref{tab:variants} and Figure~\ref{fig:envelope} locate the boundaries.
+Stationary refinement with FP32 factors collapses between $\kappa=10^{8}$ and
+$10^{9}$, whereas the guarantee tabulated by Carson and Higham
+\cite{ch2018,hm2022} is $\kappa\le10^{8}$: our experiment is tighter than
+the theory, by construction, because the bound is worst case. GMRES-based
+refinement with the same factors survives to $\kappa=10^{14}$, at which point the
+FP64 forward error is itself $10^{-2}$ and nothing better is attainable.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{figures/fig1_envelope.pdf}
+  \caption{The highest condition number at which each configuration still
+  recovers FP64 accuracy (median over five seeds). Three configurations reach
+  $10^{14}$: that is the FP64 floor, not the algorithm's limit.}
+  \label{fig:envelope}
+\end{figure}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{figures/fig2_cliff.pdf}
+  \caption{Forward error versus $\kappa$. All configurations track the FP64
+  floor $\kappa u_{64}$ (dashed) and then leave it vertically: the transition is
+  a cliff, not a degradation.}
+  \label{fig:cliff}
+\end{figure}
+
+The iteration counts grow approximately linearly in $\log\kappa$: for FP32
+factors with GMRES refinement the median total is $7,13,37,53,83,107$ steps at
+$\kappa=10^{6},10^{8},10^{9},10^{10},10^{12},10^{14}$. This growth is the price
+of the extended range and it is what Proposition~\ref{prop:corner} converts into
+a crossover in $n$.
+
+\subsection{Does the pivot floor explain it}
+
+\begin{table}[t]
+  \centering
+  \small
+  \caption{Compressed versus recomputed factors at the same $u_q=2^{-11}$,
+  $\kappa=10^{12}$, $n=48$. The backward errors agree; the preconditioner
+  deviations differ by six orders of magnitude.}
+  \label{tab:dichotomy}
+  \begin{tabular}{lrrrr}
+    \toprule
+    construction & backward error & $\abs{\hat u_{nn}}$ & $\norm{M^{-1}}$ & $\norm{AM^{-1}-I}$ \\
+    \midrule
+    FP64 factors        & $1.9{\cdot}10^{-16}$ & $5.6{\cdot}10^{-11}$ & $1.9{\cdot}10^{11}$ & $4.5{\cdot}10^{-5}$ \\
+    recompute at 11 bits & $3.0{\cdot}10^{-4}$  & $3.0{\cdot}10^{-5}$  & $2.2{\cdot}10^{5}$  & $27$ \\
+    compress to 11 bits  & $3.8{\cdot}10^{-4}$  & $5.6{\cdot}10^{-11}$ & $1.9{\cdot}10^{11}$ & $3.9{\cdot}10^{7}$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Table~\ref{tab:dichotomy} is the mechanism check. The two low-precision
+constructions have the same backward error to within $25\%$, yet the last pivot
+is preserved by compression ($5.6\cdot10^{-11}$, matching FP64) and floored by
+recomputation ($3.0\cdot10^{-5}\approx u_q\norm{U}$). Consequently
+$\norm{AM^{-1}-I}$ is bounded at $27$ for recomputation and grows to
+$3.9\cdot10^{7}$ for compression, exactly as Proposition~\ref{lem:floor} and
+Theorem~\ref{thm:dichotomy} predict. This table is also the empirical content of
+the ``same backward error, opposite fate'' claim in the abstract.
+
+\subsection{Circuit-scale matrices}
+
+Table~\ref{tab:res} reports $\rho$ and the residual on thirteen circuit
+matrices. Two observations go beyond the dense sweep.
+
+First, nine matrices have $\rho=1.000$ to three digits. This is not a
+coincidence: for an $M$-matrix with nonnegative factors, $\abs{L}\abs{U}=\abs{A}$
+exactly, so the componentwise growth is one. On such matrices a low-precision
+factorization is componentwise backward stable regardless of $\kappa$; the
+residual target of $10^{-6}$ is met by FP32 with two orders of margin
+($\rho u_{32}\approx6\cdot10^{-8}$).
+
+Second, the growth factor identifies the hard matrices without trial. The three
+matrices with $\rho\ge2\cdot10^{4}$ are precisely those flagged as
+near-singular by the solver and the slowest in our runs. This makes $\rho$ a
+cheap a-priori tag: it is computable in $O(\mathrm{nnz})$ from the factors,
+before any solve.
+
+\paragraph{Ordering interacts with $\rho$.}
+For the matrix \texttt{rajat25}, blocking the triangular form raises the fill-in
+from $7.2$M to $42.5$M nonzeros and $\rho$ from $37.7$ to $6.9\cdot10^{7}$, a
+change of six orders of magnitude on the same matrix. The heuristic that
+switches blocking off when the predicted fill exceeds $20\times\mathrm{nnz}$ is
+therefore not merely a performance rule: it also protects the numerical quality
+of the factors.
+
+\subsection{Two platforms, and the implementation axis}
+
+\begin{table}[t]
+  \centering
+  \small
+  \caption{Measured throughput ratio $s=\mathrm{TP}/\mathrm{TP}_{64}$ for a
+  shared-memory GEMM microbenchmark (checksum-verified).}
+  \label{tab:platforms}
+  \begin{tabular}{llrr}
+    \toprule
+    platform & kernel & $s$ & note \\
+    \midrule
+    aarch64 CPU, 128 cores & blocked LU, FP32 & $1.88$--$2.46$ & median $2.10$ \\
+    MetaX Mars X201 & GEMM, FP32 & $2.288$ & $n=8192$ \\
+    MetaX Mars X201 & GEMM, half storage + FP32 accumulate & $2.339$ & no MMA \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Table~\ref{tab:platforms} shows that the two platforms agree to within $9\%$ on
+$s_{32}$: for the FP32/FP64 pair they sit in the same regime, and the precision
+decision is governed by $\kappa$ and $n$, not by the device.
+
+Lowering the \emph{storage} precision does not change this: a half-storage kernel
+that still accumulates in FP32 reaches $s_{16}=2.339$, only $2\%$ above
+$s_{32}$, because the multiply-adds remain on the FP32 units. Without a
+tensor-core path the low-precision regime of Figure~\ref{fig:phase} is therefore
+empty, and Table~\ref{tab:s11} quantifies how far an implementation must go to
+enter it: $s_{11}^*=2.7$--$3.6$ at $n=4096$, against $2.34$ measured.
+
+\subsection{Attribution of the performance gap}\label{sec:attrib}
+
+A factorization two orders of magnitude slower than a vendor sparse solver
+invites the question of where the time goes. We ablated four factors on the same
+device and the same circuit matrices, changing one at a time
+(Table~\ref{tab:attrib}).
+
+\begin{table}[t]
+  \centering
+  \small
+  \caption{Multiplicative attribution of the gap to a vendor sparse solver.}
+  \label{tab:attrib}
+  \begin{tabular}{llrl}
+    \toprule
+    factor & measured ratio & evidence & nature \\
+    \midrule
+    A ordering / fill   & $\le 5.9$ (median $1.0$) & blocking vs global AMD, 13 matrices & algorithm \\
+    B blocking          & $1.5$ (FP32 only)        & TILE $8/16/32$, same kernel          & implementation \\
+    C pivoting          & $1.0$                    & partial vs static, 6 matrices        & none \\
+    D kernel efficiency & $6.9$ (residual)         & $2.82$ of $29.03$\,TFLOP/s           & implementation \\
+    \midrule
+    product, typical & $\approx 10$ & $A=1$, $C=1$ & \\
+    product, worst   & $\approx 61$ & \texttt{rajat25}, $A=5.9$ & \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Two conclusions follow. First, the algorithmic levers are nearly exhausted:
+ordering changes the fill by at most $5.9\times$ and usually by nothing, and a
+static pivot strategy buys stability at a $3.9\times$ fill cost on the single
+matrix where it matters---a trade the growth factor does not require. Second,
+the residual gap is kernel engineering, not hardware: the achieved rate is
+$9.3\%$ of the vendor GEMM on the same device, and the roofline places every
+matrix two orders of magnitude to the right of the ridge point, so the compute
+roof is far above where the kernel operates.
+
+\subsection{Threats to validity}
+
+\paragraph{Emulator.}
+Rounding is applied per operation in double, so a genuine FMA would differ in
+the last bit; and the emulator has no notion of overflow or subnormals, which
+matters for narrow-exponent formats such as FP16 but not for the TF32-like
+11-bit model used here. Conclusions about \emph{scaling} are robust; conclusions
+about constants are not.
+
+\paragraph{Scale and parallelism.}
+Dense experiments stop at $n=576$; nothing here models communication, memory
+traffic, or the pipeline bubbles of a precision switch. The cost model is
+flop-based, and Table~\ref{tab:platforms} is the only wall-clock measurement.
+
+\paragraph{The iteration count $k(\kappa)$.}
+Proposition~\ref{prop:corner} takes $k$ as input, and we supply it from
+measurement rather than from a closed-form bound; the available bounds
+\cite{hm2022} constrain feasibility, not the iteration count. The crossover
+$n^*$ should therefore be read as accurate to the accuracy of the measured $k$.
+
+\paragraph{Unmeasured upper end of $s_{11}$.}
+The tensor-core path is not reachable through the documented API on our stack,
+so $s_{11}$ is bounded from below by $2.34$ and from above only by vendor
+specifications. The threshold in Table~\ref{tab:s11} does not depend on this
+gap, but the position of the low-precision region in Figure~\ref{fig:phase} does.

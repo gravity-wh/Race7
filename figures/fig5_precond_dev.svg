@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="829" height="470" viewBox="0 0 829 470" font-family="'Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="80" y="27" font-size="16" font-weight="600" fill="#0f172a">预条件算子偏差 ‖A M⁻¹ − I‖：低精度下被封顶而非随 κ 线性增长（n=48）</text>
+<line x1="80.0" y1="48" x2="80.0" y2="408" stroke="#eef2f7"/>
+<text x="80.0" y="428" font-size="12" fill="#475569" text-anchor="middle">1e4</text>
+<line x1="142.0" y1="48" x2="142.0" y2="408" stroke="#eef2f7"/>
+<text x="142.0" y="428" font-size="12" fill="#475569" text-anchor="middle">1e5</text>
+<line x1="204.0" y1="48" x2="204.0" y2="408" stroke="#eef2f7"/>
+<text x="204.0" y="428" font-size="12" fill="#475569" text-anchor="middle">1e6</text>
+<line x1="266.0" y1="48" x2="266.0" y2="408" stroke="#eef2f7"/>
+<text x="266.0" y="428" font-size="12" fill="#475569" text-anchor="middle">1e7</text>
+<line x1="328.0" y1="48" x2="328.0" y2="408" stroke="#eef2f7"/>
+<text x="328.0" y="428" font-size="12" fill="#475569" text-anchor="middle">1e8</text>
+<line x1="390.0" y1="48" x2="390.0" y2="408" stroke="#eef2f7"/>
+<text x="390.0" y="428" font-size="12" fill="#475569" text-anchor="middle">1e9</text>
+<line x1="452.0" y1="48" x2="452.0" y2="408" stroke="#eef2f7"/>
+<text x="452.0" y="428" font-size="12" fill="#475569" text-anchor="middle">1e10</text>
+<line x1="514.0" y1="48" x2="514.0" y2="408" stroke="#eef2f7"/>
+<text x="514.0" y="428" font-size="12" fill="#475569" text-anchor="middle">1e11</text>
+<line x1="576.0" y1="48" x2="576.0" y2="408" stroke="#eef2f7"/>
+<text x="576.0" y="428" font-size="12" fill="#475569" text-anchor="middle">1e12</text>
+<line x1="638.0" y1="48" x2="638.0" y2="408" stroke="#eef2f7"/>
+<text x="638.0" y="428" font-size="12" fill="#475569" text-anchor="middle">1e13</text>
+<line x1="700.0" y1="48" x2="700.0" y2="408" stroke="#eef2f7"/>
+<text x="700.0" y="428" font-size="12" fill="#475569" text-anchor="middle">1e14</text>
+<line x1="80" y1="408.0" x2="700" y2="408.0" stroke="#eef2f7"/>
+<text x="72" y="412.0" font-size="12" fill="#475569" text-anchor="end">1e-12</text>
+<line x1="80" y1="384.0" x2="700" y2="384.0" stroke="#eef2f7"/>
+<text x="72" y="388.0" font-size="12" fill="#475569" text-anchor="end">1e-11</text>
+<line x1="80" y1="360.0" x2="700" y2="360.0" stroke="#eef2f7"/>
+<text x="72" y="364.0" font-size="12" fill="#475569" text-anchor="end">1e-10</text>
+<line x1="80" y1="336.0" x2="700" y2="336.0" stroke="#eef2f7"/>
+<text x="72" y="340.0" font-size="12" fill="#475569" text-anchor="end">1e-9</text>
+<line x1="80" y1="312.0" x2="700" y2="312.0" stroke="#eef2f7"/>
+<text x="72" y="316.0" font-size="12" fill="#475569" text-anchor="end">1e-8</text>
+<line x1="80" y1="288.0" x2="700" y2="288.0" stroke="#eef2f7"/>
+<text x="72" y="292.0" font-size="12" fill="#475569" text-anchor="end">1e-7</text>
+<line x1="80" y1="264.0" x2="700" y2="264.0" stroke="#eef2f7"/>
+<text x="72" y="268.0" font-size="12" fill="#475569" text-anchor="end">1e-6</text>
+<line x1="80" y1="240.0" x2="700" y2="240.0" stroke="#eef2f7"/>
+<text x="72" y="244.0" font-size="12" fill="#475569" text-anchor="end">1e-5</text>
+<line x1="80" y1="216.0" x2="700" y2="216.0" stroke="#eef2f7"/>
+<text x="72" y="220.0" font-size="12" fill="#475569" text-anchor="end">1e-4</text>
+<line x1="80" y1="192.0" x2="700" y2="192.0" stroke="#eef2f7"/>
+<text x="72" y="196.0" font-size="12" fill="#475569" text-anchor="end">1e-3</text>
+<line x1="80" y1="168.0" x2="700" y2="168.0" stroke="#eef2f7"/>
+<text x="72" y="172.0" font-size="12" fill="#475569" text-anchor="end">1e-2</text>
+<line x1="80" y1="144.0" x2="700" y2="144.0" stroke="#eef2f7"/>
+<text x="72" y="148.0" font-size="12" fill="#475569" text-anchor="end">1e-1</text>
+<line x1="80" y1="120.0" x2="700" y2="120.0" stroke="#eef2f7"/>
+<text x="72" y="124.0" font-size="12" fill="#475569" text-anchor="end">1</text>
+<line x1="80" y1="96.0" x2="700" y2="96.0" stroke="#eef2f7"/>
+<text x="72" y="100.0" font-size="12" fill="#475569" text-anchor="end">1e1</text>
+<line x1="80" y1="72.0" x2="700" y2="72.0" stroke="#eef2f7"/>
+<text x="72" y="76.0" font-size="12" fill="#475569" text-anchor="end">1e2</text>
+<line x1="80" y1="48.0" x2="700" y2="48.0" stroke="#eef2f7"/>
+<text x="72" y="52.0" font-size="12" fill="#475569" text-anchor="end">1e3</text>
+<rect x="80" y="48" width="620" height="360" fill="none" stroke="#94a3b8"/>
+<path d="M80.0,405.3 L204.0,361.5 L328.0,316.6 L452.0,271.1 L576.0,224.4 L700.0,178.9" fill="none" stroke="#2563eb" stroke-width="2.2" stroke-linejoin="round"/>
+<circle cx="80.0" cy="405.3" r="3.1" fill="#fff" stroke="#2563eb" stroke-width="1.8"/>
+<circle cx="204.0" cy="361.5" r="3.1" fill="#fff" stroke="#2563eb" stroke-width="1.8"/>
+<circle cx="328.0" cy="316.6" r="3.1" fill="#fff" stroke="#2563eb" stroke-width="1.8"/>
+<circle cx="452.0" cy="271.1" r="3.1" fill="#fff" stroke="#2563eb" stroke-width="1.8"/>
+<circle cx="576.0" cy="224.4" r="3.1" fill="#fff" stroke="#2563eb" stroke-width="1.8"/>
+<circle cx="700.0" cy="178.9" r="3.1" fill="#fff" stroke="#2563eb" stroke-width="1.8"/>
+<path d="M80.0,204.3 L204.0,161.4 L328.0,117.7 L452.0,81.3 L576.0,80.2 L700.0,78.1" fill="none" stroke="#dc2626" stroke-width="2.2" stroke-linejoin="round"/>
+<circle cx="80.0" cy="204.3" r="3.1" fill="#fff" stroke="#dc2626" stroke-width="1.8"/>
+<circle cx="204.0" cy="161.4" r="3.1" fill="#fff" stroke="#dc2626" stroke-width="1.8"/>
+<circle cx="328.0" cy="117.7" r="3.1" fill="#fff" stroke="#dc2626" stroke-width="1.8"/>
+<circle cx="452.0" cy="81.3" r="3.1" fill="#fff" stroke="#dc2626" stroke-width="1.8"/>
+<circle cx="576.0" cy="80.2" r="3.1" fill="#fff" stroke="#dc2626" stroke-width="1.8"/>
+<circle cx="700.0" cy="78.1" r="3.1" fill="#fff" stroke="#dc2626" stroke-width="1.8"/>
+<path d="M80.0,111.3 L204.0,70.9 L328.0,73.9 L452.0,85.5 L576.0,85.6 L700.0,55.0" fill="none" stroke="#059669" stroke-width="2.2" stroke-dasharray="5,3" stroke-linejoin="round"/>
+<circle cx="80.0" cy="111.3" r="3.1" fill="#fff" stroke="#059669" stroke-width="1.8"/>
+<circle cx="204.0" cy="70.9" r="3.1" fill="#fff" stroke="#059669" stroke-width="1.8"/>
+<circle cx="328.0" cy="73.9" r="3.1" fill="#fff" stroke="#059669" stroke-width="1.8"/>
+<circle cx="452.0" cy="85.5" r="3.1" fill="#fff" stroke="#059669" stroke-width="1.8"/>
+<circle cx="576.0" cy="85.6" r="3.1" fill="#fff" stroke="#059669" stroke-width="1.8"/>
+<circle cx="700.0" cy="55.0" r="3.1" fill="#fff" stroke="#059669" stroke-width="1.8"/>
+<line x1="718" y1="50" x2="738" y2="50" stroke="#2563eb" stroke-width="2.2"/>
+<text x="745" y="54" font-size="12" fill="#334155">FP64 分解</text>
+<line x1="718" y1="71" x2="738" y2="71" stroke="#dc2626" stroke-width="2.2"/>
+<text x="745" y="75" font-size="12" fill="#334155">FP32 分解</text>
+<line x1="718" y1="92" x2="738" y2="92" stroke="#059669" stroke-width="2.2"/>
+<text x="745" y="96" font-size="12" fill="#334155">11 位分解</text>
+<text x="390.0" y="454" font-size="13" fill="#334155" text-anchor="middle">κ₂(A)</text>
+<text x="20" y="228.0" font-size="13" fill="#334155" text-anchor="middle" transform="rotate(-90 20 228.0)">‖A M⁻¹ − I‖_F</text>
+</svg>

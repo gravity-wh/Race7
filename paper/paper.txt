@@ -1,0 +1,81 @@
+T|Phase Boundaries of Mixed-Precision LU: Pivot Floors, Growth Factors, and Hardware-Dependent Precision Allocation
+S|Draft technical report · 2026-10-30 · compiled with a minimal PostScript typesetter (no TeX available in the authoring environment)
+Q|Two factorizations of the same matrix computed at the same unit roundoff u_q can exhibit nearly identical backward error, yet differ by six orders of magnitude in how far the induced preconditioner deviates from the identity. We trace this to a pivot floor: recomputing the factorization at precision u_q confines the smallest pivot to the noise level, whereas rounding a high-precision factorization preserves every pivot to relative accuracy u_q. Consequently stationary iterative refinement contracts only with compressed factors, while GMRES-based refinement contracts only with recomputed ones. We show further that the achievable residual is governed by the componentwise growth factor ρ = |||L||U|||/||A||, and validate res ≈ ρu_f to within two orders of magnitude on thirteen circuit matrices spanning ρ from 1 to 1.6e11. Finally we show that the optimal precision allocation is a function of the pair (κ(A), s), where s is the platform's FP32/FP64 throughput ratio, and we reformulate the low-precision decision as an implementation threshold rather than a hardware property.
+H|1. Introduction
+P|Write the same matrix twice at the same unit roundoff u_q: once by compressing a high-precision factorization, once by recomputing it. The backward errors agree to within 25%. The induced preconditioners do not: the deviation ||AM⁻¹ − I|| is 27 in one case and 3.9e7 in the other. The reason is a pivot floor, and the consequence is that the two constructions call for opposite refinement schemes.
+P|That observation is the subject of this paper. It matters because the usual way to lower the precision of a linear solve — "store the factors in half precision" — mixes the two constructions without distinguishing them, and the literature analyses the resulting algorithm while treating the factors as an opaque object of some precision u_f. We show that the construction is an independent axis, and that the two axes interact: the accuracy attainable at a given precision depends on how the factors were made.
+P|The four slots. A solve has four places where precision can be lowered: the factorization (O(n³)), the storage of L and U (O(n²)), the triangular substitutions (O(n²) per solve), and the residual that drives refinement (O(n²) per iteration). Only the first carries the arithmetic, so only the first buys throughput; the fourth sets the attainable accuracy.
+P|Three quantities. The analysis is organized by κ(A) = ||A||·||A⁻¹||, ρ = |||L||U|||/||A||, and ω = |||A⁻¹||L||U||| ≤ κρ. κ amplifies the forward error, ρ the backward error, and ω is the componentwise condition number that appears when both are combined. The practical point is that ρ is computable in O(nnz) from the factors alone, before any solve, and it predicts the residual to within two orders of magnitude on the matrices we test.
+P|Contributions. (i) A pivot-floor lemma and a dichotomy theorem identifying the construction as an independent design axis, with the assumptions under which it holds and a counterexample showing they are not automatic. (ii) A two-sided error analysis in which the residual refinement rate is the same quantity that governs GMRES convergence. (iii) A hardware-parameterized cost model whose optimum is a corner solution, reformulated as an implementation threshold. (iv) An empirical study on thirteen circuit matrices, nine of which exhibit ρ = 1 exactly.
+H|2. Setup
+P|Let A ∈ R^(n×n) be nonsingular, PAQ = LU with partial pivoting, M = LU, and u_q = 2^(−p) the unit roundoff at p significant bits. Let γ_k = ku/(1−ku). We compare two constructions at the same u: recompute, where the factors come from Gaussian elimination carried out in precision u; and compress, where L and U are rounded entrywise from a high-precision factorization.
+H|3. Structure: pivot floors and the dichotomy
+h|3.1 Perturbation of the factors
+P|Lemma 1. With E_r = A − M_r and E_c = A − M_c, we have |E_r| ≤ γ_n|L||U| and |E_c| ≤ (2u + 3u²)|L||U|. Consequently both constructions satisfy ||E|| ≤ c·u·ρ·||A||. This is the precise sense in which they have the same backward error: neither bound involves κ, so any difference in behaviour must come from the direction of E, not its magnitude.
+h|3.2 The pivot floor
+P|Lemma 2. The computed pivots of M_r satisfy |û_kk − u_kk| ≤ γ_(k−1)·||U||. If the exact pivot is below the noise level the computed one carries no information about it. A single fused multiply-add rounds its exact result once, so a 2×2 elimination commits relative error and no floor appears; the floor is a many-update accumulation phenomenon, which we confirmed numerically.
+h|3.3 Pivot dominance and the dichotomy
+P|Assumption (A1): σ_min(LU) ≥ c·min_k|u_kk|. A sufficient condition is c⁻¹ = κ₂(V)·||L⁻¹||, where V is the eigenvector matrix of U. It holds for normal triangular factors, for M-matrix factorizations with nonnegative factors (where |L||U| = |A|), and for the nine circuit matrices of Section 6. It fails for U = [[1, t], [0, ε]] with t ≫ 1, where σ_min/min|u_kk| ≈ 1/√(1+t²); we verified the predicted fall from 0.71 at t = 1 to 1.0e−6 at t = 1e6.
+P|Theorem 1 (dichotomy). If 4uρκ < 1 then ||I − M_c⁻¹A|| ≤ 2uρκ/(1−2uρκ) < 1: compression is a contraction for stationary refinement. Under the quantization-floor assumption (A2), σ_min(M_r) ≥ c′u||U||, we get ||A M_r⁻¹ − I|| ≤ nρ||L||/c′ = O(1), independent of κ and of u: recomputation yields a bounded preconditioner. Conversely, under (A1) and a sub-floor pivot, ||I − M_r⁻¹A|| ≈ n||L||/c ≫ 1, so recomputation is unusable for stationary refinement at every κ.
+P|The failure modes coincide: the off-diagonal magnitude that destroys (A1) also raises the noise level that creates the floor, so when (A1) fails badly no low-precision factorization is usable and the dichotomy is vacuous rather than false.
+C|  same u_q = 2^-11, κ = 1e12, n = 48
+  construction          backward err   |u_nn|     ||M^-1||    ||AM^-1 - I||
+  FP64 factors          1.9e-16        5.6e-11    1.9e+11     4.5e-05
+  recompute at 11 bits  3.0e-04        3.0e-05    2.2e+05     2.7e+01
+  compress to 11 bits   3.8e-04        5.6e-11    1.9e+11     3.9e+07
+F|Table 1. The mechanism check. Same backward error to within 25%, opposite fate.
+H|4. Bounds: residual versus forward error
+P|The residual of a factorized solve satisfies, exactly, r = b − Ax̂ = (M − A)x̂ − Aδ = Ex̂ − Aδ, where δ collects the rounding of the substitutions. The two terms are the factorization error and the solve error.
+P|Proposition 2. ||r||/(||A||||x̂||) ≤ γ_nρ + c_t·u_t·κ(M). For u_t ≪ u_fκ the first term dominates and res ≲ γ_nρ. In practice the observed res/(ρu) is O(1) to O(100) and does not grow with n — for a 682,712-order matrix it is 0.45 — so we use res ≈ ρu as an operational estimate and γ_nρ as the certified bound.
+P|Proposition 3. One refinement step gives r_(k+1) = E M⁻¹ r_k − Aδ, so the residual contracts at the rate ||AM⁻¹ − I|| — the very quantity of Theorem 1 — and floors at order ρu_r. This unifies two symptoms usually reported separately: slow GMRES and slow residual refinement are one phenomenon.
+P|Proposition 4. ||x − x̂||/||x|| ≤ κ·||r||/(||A||||x||) ≲ κρu_r. Hence a residual target τ needs ρu_f ≲ τ and is independent of κ, while a forward-error target ε needs κρu_r ≲ ε and is linear in κ. The two are decoupled by the choice of u_r.
+C|  matrix        n          rho        kappa_inf    residual     res/(rho u64)
+  ASIC_100k     99,340     1.000      1.5e+11      4.3e-17      0.39
+  ASIC_680ks    682,712    1.000      9.5e+19      4.9e-17      0.45
+  bcircuit      68,902     1.000      2.2e+09      7.3e-18      0.07
+  G2_circuit    150,102    1.004      2.0e+07      7.7e-15      69
+  rajat25       87,190     6.9e+07    2.0e+15      9.6e-09      1.25
+  rajat27       20,640     2.1e+04    2.0e+15      1.8e-12      0.78
+  twotone       120,750    1.6e+11    4.5e+09      1.4e-06      0.08
+F|Table 2. Growth factor and residual on circuit matrices (BTF, AMD, KLU). The ratio stays within two orders of magnitude across eleven orders of magnitude in ρ.
+H|5. Hardware and the implementation axis
+P|Let s_u be the throughput of precision u relative to FP64 and k(κ) the measured number of refinement steps. In FP64-equivalent units T(u) = (2/3)n³/s_u + 4k·n², and the speedup is (2/3)n³/T(u). The cost is monotone in every slot and the feasible set is monotone in each, so the optimum is a corner solution. Between two precision levels the winner flips at n*(κ, s) = 6ks/(s−1).
+P|The implementation axis. s_32 is fixed by the device, but s_11 is a property of the kernel. Writing Δk = k_11 − k_32, the low-precision tier beats FP32 if and only if s_11 > s_11*(κ, n) = 1/(1/s_32 − 6Δk/n), which has a solution only when n > 6s_32Δk. The threshold decreases monotonically in n and approaches s_32 from above: the low-precision tier is entered from above, never from below.
+C|  kappa     delta_k   n > 6 s32 dk   s11*(n=4096)   s11*(n=16384)
+  1e6       79        1,085          3.11           2.45
+  1e8       110       1,510          3.62           2.52
+  1e10      78        1,071          3.10           2.45
+  1e12      48        659            2.73           2.38
+F|Table 3. Required low-precision throughput for the 11-bit tier to pay, with s_32 = 2.288 measured.
+P|Measured on the MetaX Mars X201, s_32 = 2.288 and a half-storage / FP32-accumulate kernel reaches only s_16 = 2.339: 2% to 17% short of the threshold at the sizes we can afford. A tensor-core path, whose s_11 is plausibly 8 to 16, clears it by a factor of three. The decision variable is therefore the implementation, not the device.
+H|6. Experiments
+P|Precision emulator. All dense experiments use a pure-Python emulator that rounds every multiply-add to p significant bits; since a·b is exact in double for p ≤ 27, the operation round_p(a·b + c) models a single-rounded FMA, with no hidden extended precision.
+P|Protocol. n = 64 unless stated; eleven variants × ten condition numbers × five seeds; spot checks at n = 32, 128 and a banded n = 576. The variants differ only in (u_f, u_t, u_r) and in whether the factors are compressed or recomputed.
+C|  variant                  k=1e2    k=1e4    k=1e6    k=1e8    k=1e9    k=1e10   k=1e12
+  FP32, no refinement       2.3e+08  2.5e+08  1.4e+08  1.7e+08  4.9e+08  5.4e+07  2.0e+06
+  FP32 + stationary         0.84     1.0      1.6      2.0      7.5e+09  9.0e+07  6.3e+06
+  FP32 + GMRES              0.70     1.1      1.2      0.69     1.8      1.2      1.7
+  11-bit recompute + IR     0.66     1.5e+11  1.7e+12  3.1e+10  2.1e+11  2.3e+08  2.7e+06
+  11-bit recompute + GMRES  0.86     1.3      1.6      1.4      1.4      1.4      1.7
+  11-bit compress + IR      0.87     0.92     1.0      7.3e+09  3.7e+12  9.6e+13  9.1e+18
+  11-bit compress + GMRES   0.72     1.2      1.2      1.3      1.2      1.2      1.3e+07
+F|Table 4. Forward-error ratio FE/FE_64 (median of five seeds). Values near 1 mean FP64 accuracy is recovered; values above 1e5 mean divergence.
+P|Stationary refinement with FP32 factors collapses between κ = 1e8 and 1e9, whereas the guarantee tabulated by Carson and Higham is κ ≤ 1e8: our experiment is tighter than the theory, by construction, because the bound is worst case. GMRES-based refinement with the same factors survives to κ = 1e14, at which point the FP64 forward error is itself 1e−2 and nothing better is attainable. Iteration counts grow approximately linearly in log κ: 7, 13, 37, 53, 83, 107 steps at κ = 1e6 through 1e14.
+P|Circuit matrices. Nine of thirteen matrices have ρ = 1.000 to three digits, because for an M-matrix with nonnegative factors |L||U| = |A| exactly. On such matrices a low-precision factorization is componentwise backward stable regardless of κ; the residual target of 1e−6 is met by FP32 with two orders of margin. The three matrices with ρ ≥ 2e4 are precisely those the solver flags as near-singular, which makes ρ a cheap a-priori tag computable from the factors alone.
+P|Ordering interacts with ρ. For rajat25, blocking the triangular form raises the fill-in from 7.2M to 42.5M nonzeros and ρ from 37.7 to 6.9e7 — six orders of magnitude on the same matrix. The heuristic that disables blocking when the predicted fill exceeds 20×nnz therefore protects numerical quality, not only performance.
+C|  platform                kernel                                s
+  aarch64 CPU, 128 cores  blocked LU, FP32                      1.88 - 2.46 (median 2.10)
+  MetaX Mars X201         GEMM, FP32                            2.288
+  MetaX Mars X201         GEMM, half storage + FP32 accumulate  2.339
+F|Table 5. Measured throughput ratios on a checksum-verified microbenchmark.
+P|The two platforms agree to within 9% on s_32: for the FP32/FP64 pair they sit in the same regime. Lowering the storage precision does not change this — a half-storage kernel that still accumulates in FP32 reaches 2.339, only 2% above s_32 — because the multiply-adds remain on the FP32 units. Without a tensor-core path the low-precision regime is empty.
+P|Threats to validity. Rounding is applied per operation in double, so a genuine FMA would differ in the last bit, and the emulator has no notion of overflow or subnormals. Dense experiments stop at n = 576 and nothing models communication or memory traffic. The iteration count k(κ) is measured rather than bounded, so n* should be read as accurate to the accuracy of k. The tensor-core path is not reachable through the documented API on our stack, so s_11 is bounded from below by 2.34 and from above only by vendor specifications.
+H|7. Conclusion
+P|Three statements summarize the paper. First, factor precision is not a scalar: compressed and recomputed factors at the same unit roundoff have the same backward error and opposite behaviour, and the mechanism is a pivot floor. Second, the attainable residual is governed by the componentwise growth factor ρ, computable from the factors, which predicts the residual to within two orders of magnitude across eleven orders of magnitude in ρ — and on circuit matrices it is ρ, not κ, that separates the ten tractable matrices from the three hard ones. Third, the optimal precision is a function of (κ, s) and, at fixed hardware, of the implementation through the threshold s_11*: lowering precision pays only when the low-precision kernel is genuinely faster, which is a property of the code rather than of the device.
+H|References
+P|[1] E. Carson, N. J. Higham. Accelerating the solution of linear systems by iterative refinement in three precisions. SIAM J. Sci. Comput. 40(2): A817-A847, 2018.
+P|[2] P. Amestoy, A. Buttari, N. J. Higham, J.-Y. L'Excellent, T. Mary, B. Vieublé. Five-precision GMRES-based iterative refinement. SIAM J. Matrix Anal. Appl. 45(1): 529-552, 2024.
+P|[3] N. J. Higham, T. Mary. Mixed precision algorithms in numerical linear algebra. Acta Numerica 31: 347-414, 2022.
+P|[4] K. Ozaki, T. Ogita, S. Oishi, S. M. Rump. Error-free transformations of matrix multiplication. Numer. Algorithms 59(1): 95-118, 2012.
+P|[5] A. Abdurakhmanov, T. Mary, H. Ltaief, D. E. Keyes, S. A. Fahmy. Error-controlled mixed-precision Cholesky factorization with MX microscaling formats. ACM TOMS 52(4), 2026.
+P|[6] J. Dongarra, P. Luszczek. HPL-MxP benchmark: mixed-precision algorithms, iterative refinement, and scalable data generation. IJHPCA, 2025.

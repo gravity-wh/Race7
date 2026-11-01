@@ -1,0 +1,162 @@
+% 04-section4.tex -- §4 完整版（\input 进 main.tex 替换原 §4）
+% 与 §3 共用记号；核心是把 "残差的收缩因子" 等同于 §3 的 ‖AM^{-1}-I‖。
+
+\section{Bounds: residual versus forward error}\label{sec:bounds}
+
+Section~\ref{sec:structure} separated the two constructions by the size of
+$\norm{AM^{-1}-I}$. That same quantity turns out to be the \emph{contraction
+factor of the residual}, which is what makes the analysis actionable: a single
+number predicts both the cost of GMRES and the attainable residual.
+
+\subsection{The residual of a factorized solve}
+
+Let $M$ be a factorization used to solve $Ax=b$, and let $\hat x$ be the computed
+solution. Write $\hat x=M^{-1}b+\delta$, where $\delta$ collects the rounding of
+the triangular substitutions. Then, exactly,
+\begin{equation}\label{eq:residual-identity}
+  r \;=\; b-A\hat x \;=\; (M-A)\,\hat x \;-\; A\,\delta \;=\; E\,\hat x - A\,\delta .
+\end{equation}
+The two terms are the \emph{factorization} error and the \emph{solve} error; their
+relative sizes decide which one controls the residual.
+
+\begin{proposition}[Residual bound]\label{prop:residual}
+With $E$ as in Lemma~\ref{lem:perturb} and $\norm{\delta}\le c_tu_t\kappa(M)\norm{\hat x}$
+for the substitution,
+\begin{equation}
+  \frac{\norm{r}}{\norm{A}\norm{\hat x}}
+  \;\le\; \gamma_n\,\rho \;+\; c_t\,u_t\,\kappa(M).
+\end{equation}
+For a factorization at $u_f$ and substitutions at $u_t\le u_r\ll u_f\kappa$, the
+first term dominates and
+\begin{equation}
+  \frac{\norm{r}}{\norm{A}\norm{\hat x}} \;\lesssim\; \gamma_n\,\rho .
+\end{equation}
+\end{proposition}
+
+\begin{proof}
+Immediate from \eqref{eq:residual-identity}, Lemma~\ref{lem:perturb} and the
+triangle inequality:
+$\norm{E\hat x}\le\gamma_n\norm{\abs{L}\abs{U}}\norm{\hat x}=\gamma_n\rho\norm{A}\norm{\hat x}$,
+$\norm{A\delta}\le c_tu_t\kappa(M)\norm{A}\norm{\hat x}$.
+\end{proof}
+
+\begin{remark}[The $\gamma_n$ is worst case]\label{rem:gamma}
+$\gamma_n=nu/(1-nu)$ counts the worst case in which every rounding in the
+$n-1$ updates of an entry conspires. In practice the observed ratio
+$\mathrm{res}/(\rho u)$ is $O(1)$--$O(10^2)$ and \emph{does not grow with $n$}:
+for the $n=682{,}712$ matrix of Table~\ref{tab:res} it is $0.45$. The mechanism
+is that the rounding errors of the individual updates are relative to their own
+partial sums and add incoherently, whereas $\abs{L}\abs{U}$ already
+over-estimates the entries that matter. We therefore use $\mathrm{res}\approx\rho u$
+as an \emph{operational} estimate and $\gamma_n\rho u$ as the certified bound.
+\end{remark}
+
+\subsection{Refinement is a contraction driven by the same quantity}
+
+\begin{proposition}[Residual recurrence]\label{prop:recurrence}
+Let $x_{k+1}=x_k+M^{-1}r_k$ be one step of iterative refinement, with $r_k$
+evaluated in precision $u_r$. Then
+\begin{equation}\label{eq:recurrence}
+  r_{k+1} \;=\; E M^{-1} r_k \;-\; A\,\delta_{k+1},
+  \qquad\text{so}\qquad
+  \norm{r_{k+1}} \;\le\; \norm{AM^{-1}-I}\,\norm{r_k} \;+\; \norm{A}\norm{\delta_{k+1}} .
+\end{equation}
+Consequently $\norm{r_k}\to$ a floor of order $\rho u_r\norm{A}\norm{x}$ at the
+geometric rate $\norm{AM^{-1}-I}$.
+\end{proposition}
+
+\begin{proof}
+$r_{k+1}=b-Ax_{k+1}=b-Ax_k-AM^{-1}r_k=r_k-AM^{-1}r_k-A\delta_{k+1}
+=(I-AM^{-1})r_k-A\delta_{k+1}$, and $I-AM^{-1}=-EM^{-1}$.
+The floor is Proposition~\ref{prop:residual} applied at precision $u_r$.
+\end{proof}
+
+\begin{remark}[Why \S\ref{sec:structure} and \S\ref{sec:bounds} are the same statement]
+The contraction factor in \eqref{eq:recurrence} is $\norm{AM^{-1}-I}$: the very
+quantity that Theorem~\ref{thm:dichotomy} bounds to $O(1/u_q)$ for recomputed
+factors and to $\Theta(\kappa u_q)$ for compressed ones. A large
+$\norm{AM^{-1}-I}$ therefore has two symptoms that are usually reported
+separately---slow GMRES and slow residual refinement---and they are one
+phenomenon.
+\end{remark}
+
+\subsection{Forward error from the residual}
+
+\begin{proposition}[Forward bound]\label{prop:forward}
+If $r=b-A\hat x$ then $x-\hat x=-A^{-1}r$ and
+\begin{equation}
+  \frac{\norm{x-\hat x}}{\norm{x}}
+  \;\le\; \kappa\,\frac{\norm{r}}{\norm{A}\norm{x}}
+  \;\lesssim\; \kappa\,\rho\,u_r .
+\end{equation}
+\end{proposition}
+
+\begin{proof}
+$x-\hat x=A^{-1}r$, so $\norm{x-\hat x}\le\norm{A^{-1}}\norm{r}
+=\kappa\norm{r}/\norm{A}$; divide by $\norm{x}$ and insert
+Proposition~\ref{prop:residual} at precision $u_r$.
+\end{proof}
+
+\begin{corollary}[Two independent targets]\label{cor:targets}
+A residual target $\tau$ (what a SPICE-like convergence check enforces) needs
+$\rho u_f\lesssim\tau$ and is \emph{independent of $\kappa$};
+a forward-error target $\varepsilon$ needs $\kappa\rho u_r\lesssim\varepsilon$
+and is \emph{linear in $\kappa$}. The two requirements are decoupled by the
+choice of $u_r$: one may stop at $u_f$ (cheap) when only the residual is
+checked, and must refine to $u_r\approx\varepsilon/(\kappa\rho)$ otherwise.
+\end{corollary}
+
+\subsection{Empirical validation}
+
+\begin{table}[t]
+  \centering
+  \small
+  \caption{$\mathrm{res}/(\rho u_{64})$ on circuit matrices (BTF, AMD, KLU).
+  Ratios stay within two orders of magnitude across eleven orders of magnitude
+  in $\rho$; full table in the repository.}
+  \label{tab:res}
+  \begin{tabular}{lrrrrr}
+    \toprule
+    matrix & $n$ & $\rho$ & $\kappa_\infty$ & residual & $\mathrm{res}/(\rho u_{64})$ \\
+    \midrule
+    ASIC\_100k  & 99{,}340  & $1.000$ & $1.5\times10^{11}$ & $4.3\times10^{-17}$ & $0.39$ \\
+    ASIC\_680ks & 682{,}712 & $1.000$ & $9.5\times10^{19}$ & $4.9\times10^{-17}$ & $0.45$ \\
+    bcircuit    & 68{,}902  & $1.000$ & $2.2\times10^{9}$  & $7.3\times10^{-18}$ & $0.07$ \\
+    G2\_circuit & 150{,}102 & $1.004$ & $2.0\times10^{7}$  & $7.7\times10^{-15}$ & $69$ \\
+    rajat25     & 87{,}190  & $6.9\times10^{7}$ & $2.0\times10^{15}$ & $9.6\times10^{-9}$ & $1.25$ \\
+    rajat27     & 20{,}640  & $2.1\times10^{4}$ & $2.0\times10^{15}$ & $1.8\times10^{-12}$ & $0.78$ \\
+    twotone     & 120{,}750 & $1.6\times10^{11}$ & $4.5\times10^{9}$ & $1.4\times10^{-6}$ & $0.08$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Proposition~\ref{prop:residual} predicts $\mathrm{res}\lesssim\gamma_n\rho u$;
+Table~\ref{tab:res} shows $\mathrm{res}\approx\rho u$ with a constant between
+$0.07$ and $74$, and no systematic growth with $n$. Two consequences are worth
+recording:
+\begin{enumerate}
+  \item The bound is usable as a \emph{planning} tool: $\rho$ is computable in
+        $O(\mathrm{nnz})$ from the factors alone, before any solve is performed.
+  \item The residual target of $10^{-6}$ used by circuit simulators is met by
+        FP32 on the ten matrices with $\rho\approx1$ ($\rho u_{32}\approx6\times10^{-8}$)
+        and missed by the three with $\rho\ge2\times10^{4}$---a split that
+        $\kappa$ alone does not predict (ASIC\_680ks has $\kappa=9.5\times10^{19}$
+        yet $\rho=1$).
+\end{enumerate}
+
+\subsection{Remarks}
+
+\paragraph{Relation to componentwise backward error.}
+Proposition~\ref{prop:residual} is the normwise consequence of the componentwise
+statement $\abs{r}\le\gamma_n\abs{L}\abs{U}\abs{\hat x}$, which is the LU
+analogue of the Oettli--Prager criterion. Reporting $\rho$ rather than
+$\kappa$ is therefore not a heuristic: it is the natural scale of the backward
+error of a factorized solve.
+
+\paragraph{What the analysis does not cover.}
+The bound assumes the substitutions are accurate for $M$; if the factors
+themselves are so ill-conditioned that the solve loses digits ($\kappa(M)u_t\gtrsim1$,
+the regime of Theorem~\ref{thm:dichotomy}(3)), the second term of
+Proposition~\ref{prop:residual} dominates and the residual is limited by the
+solve rather than by the factorization. This is exactly the red zone of
+Remark~\ref{rem:coincide}.

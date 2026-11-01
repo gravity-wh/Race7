@@ -1,0 +1,836 @@
+                      Error-Controlled Mixed-Precision Cholesky Factorization
+                                              withMXMicroscalingFormats
+                    Abdurauf Abdurakhmanov, Theo Mary, Hatem Ltaief, David E Keyes, Suhaib A.
+                                                                      Fahmy
+                    Tocitethis version:
+                   Abdurauf Abdurakhmanov, Theo Mary, Hatem Ltaief, David E Keyes, Suhaib A. Fahmy. Error-Controlled
+                   Mixed-PrecisionCholeskyFactorizationwithMXMicroscalingFormats. ACMTransactionsonMathematical
+                   So昀琀ware, In press. ⟨hal-05641535v2⟩
+                                                       HALId: hal-05641535
+                                             https://hal.science/hal-05641535v2
+                                                          Submitted on 17 Sep 2026
+                  HALisamulti-disciplinary open access archive               L’archiveouvertepluridisciplinaireHAL,estdes-
+              for the deposit and dissemination of scienti昀椀c re-        tinée au dépôt et à la di昀昀usion de documents scien-
+              searchdocuments,whethertheyarepublishedornot. ti昀椀quesdeniveaurecherche,publiésounon,émanant
+              Thedocumentsmaycomefromteachingandresearch des établissements d’enseignement et de recherche
+              institutions in France or abroad, or from public or pri-   français ou étrangers, des laboratoires publics ou
+              vate research centers.                                     privés.
+                         Distributed under a Creative Commons CC BY 4.0 - Attribution - International License
+              Error-Controlled Mixed-Precision Cholesky Factorization with MX Microscaling
+              Formats
+              ABDURAUFABDURAKHMANOV,KingAbdullahUniversityofScienceandTechnology,SaudiArabia
+              THEOMARY,SorbonneUniversité,CNRS,LIP6,France
+              HATEMLTAIEF,KingAbdullahUniversityofScienceandTechnology,SaudiArabia
+              DAVIDE.KEYES,KingAbdullahUniversityofScienceandTechnology,SaudiArabia
+              SUHAIBA.FAHMY,KingAbdullahUniversityofScienceandTechnology,SaudiArabia
+              Existing tile-centric mixed-precision Cholesky factorization, as used in recent Gordon Bell campaigns, is based on a heuristic that
+              bounds only rounding contribution while ignoring under昀氀ow when classifying tiles for di昀昀erent IEEE 昀氀oating point precisions. Direct
+              application to new low-precision formats can produce numerically unstable outcomes.
+               Weintroduce an error-controlled ladder strategy for tile-centric precision assignment that addresses the under昀氀ow challenge,
+              extending mixed-precision Cholesky factorization with Open Compute Project (OCP) standardized Microscaling (MX) block-scaled
+              formats. Proven numerically robust, our ladder bounds rounding and under昀氀ow errors at each candidate precision and selects the
+              smallest one satisfying a target tolerance.
+               OnMatérncovariancematrices, existing approaches silently overshoot ÿ by more than an order of magnitude at loose tolerances
+              whereFP8under昀氀owdominateserror, whereas our ladder approach better matches user-speci昀椀edÿ by relying on hardware-supported
+              low-precision formats (MXFP8/MXFP4). Furthermore, with our proposed MXFP16 extension, our approach delivers up to 1.79×
+              speedup over the same approach with just IEEE FP formats on NVIDIA GB200 GPU, while reducing memory by roughly 30% and
+              preserving accuracy bounds violated by previous approaches. To our knowledge, this is the 昀椀rst study to evaluate MX formats (down
+              to MXFP4) as working storage-and-compute precisions in dense matrix factorization.
+              ACMReferenceFormat:
+              Abdurauf Abdurakhmanov, Theo Mary, Hatem Ltaief, David E. Keyes, and Suhaib A. Fahmy. 2026. Error-Controlled Mixed-Precision
+              Cholesky Factorization with MX Microscaling Formats. ACM Trans. Math. Softw. 52, 4 (September 2026), 18 pages. https://doi.org/
+              XXXXXXX.XXXXXXX
+              1 Introduction
+              Mixed-precision computation has gained signi昀椀cant traction in machine learning due to its potential to reduce compu-
+              tation time, memory footprint, and data movement. Block-scaled formats, which share an exponent across a group
+              of elements, have emerged as an e昀昀ective low-precision representation for machine learning, supported in modern
+              hardwareaccelerators. The Microscaling (MX) speci昀椀cation [19]4now supported on NVIDIA’s B200, AMD’s MI300, and
+              Microsoft’s Maia 1004standardizes one such design point with a 昀椀xed 32-element block and an 8-bit shared scale across
+              a family of sub-byte element formats (FP8, FP6, FP4), making block-scaled arithmetic broadly portable across vendors.
+              Scienti昀椀c computing applications have been slower to adopt these techniques, often relying on double-precision arith-
+              metic to preserve numerical stability. Showcased in recent Gordon Bell campaigns [3, 13], tile-centric mixed-precision
+              Authors’ Contact Information: Abdurauf Abdurakhmanov, King Abdullah University of Science and Technology, Thuwal, Saudi Arabia, abdurauf.
+              abdurakhmanov@kaust.edu.sa; Theo Mary, Sorbonne Université, CNRS, LIP6, Paris, France, theo.mary@lip6.fr; Hatem Ltaief, King Abdullah University
+              of Science and Technology, Thuwal, Saudi Arabia, hatem.ltaief@kaust.edu.sa; David E. Keyes, King Abdullah University of Science and Technology,
+              Thuwal, Saudi Arabia, david.keyes@kaust.edu.sa; Suhaib A. Fahmy, King Abdullah University of Science and Technology, Thuwal, Saudi Arabia,
+              suhaib.fahmy@kaust.edu.sa.
+              2026. Manuscript submitted to ACM
+              Manuscript submitted to ACM                                                1
+                2                                   Abdurakhmanov,Mary,Ltaief, Keyes, and Fahmy
+                Cholesky factorization [17] mitigates the cost of full double precision by classifying matrix tiles into precision buckets
+                (e.g., FP32, FP16, FP8) with a norm-based rounding-error test. The classi昀椀cation rule is a single-threshold test: a tile is
+                admitted to a bucket if its estimated rounding error lies below a user-speci昀椀ed tolerance ÿ. The assignment is made
+                once, before factorization begins, and is not revisited during execution. This formulation is well suited to IEEE single
+                precision, where the gap between the smallest normal number and typical factorization intermediates is large enough
+                that rounding error dominates. The gap narrows at FP16 and shrinks by several orders of magnitude at FP84the
+                lowest-precision bucket the baseline admits4where a non-negligible fraction of tile entries may silently under昀氀ow. The
+                resulting error is not proportional to the unit roundo昀昀 and is therefore invisible to the rounding-only rule: in practice,
+                the baseline can deliver a relative factorization error more than an order of magnitude (up to ∼60×) greater than the
+                user’s requested ÿ while reporting that the assignment was successful, so the user-speci昀椀ed tolerance functions as a
+                heuristic guideline rather than an enforced bound. Existing tile-centric mixed-precision frameworks also do not exploit
+                block-scaled representations within tiles, even though such representations can substantially reduce the under昀氀ow
+                componentoftheerrorandtherebyadmitlower-precision tiles than the IEEE-only candidate set allows.
+                  Weaddressbothlimitations together via an error-controlled ladder for tile-centric precision assignment that natively
+                accommodates block-scaled formats as candidates. The choice to fold scaled representations into the ladder’s candidate
+                set rather than evaluate them in isolation is deliberate: applying a more principled assignment rule to the baseline’s
+                IEEE precision tiers tightens the error bound but loses throughput, because both FP8 and FP16 tiles are pushed up to
+                FP32oncetheirunder昀氀owcontributionsbecomevisible4FP32becomestheonlyIEEEcandidatethatconsistentlypasses
+                the admissibility test for tiles the lower tiers can no longer carry. Scale-aware candidates close this gap4the shared
+                scale enlarges the e昀昀ective dynamic range at sub-byte and narrow-IEEE precision alike, letting the ladder admit tiles at
+                the low tiers again with provable bounds on both rounding and under昀氀ow. The ladder and the scaled candidates are
+                therefore complementary by design: the ladder is what makes scaled candidates safe to deploy, and scaled candidates
+                are what make the ladder fast enough to be useful.
+                  Theladder walks candidate precisions from cheapest to most expensive and, at each tier, bounds both the rounding
+                error (via the classical norm-based inequality) and the under昀氀ow error (via an entrywise scan against the smallest
+                representable value of the candidate format); the 昀椀rst precision whose combined bound satis昀椀es the user tolerance
+                is selected. The ladder is format-agnostic and natively accommodates per-block scaling factors, treating IEEE and
+                block-scaled formats as peer candidates on the same admissibility test, with the standardized MX format (ġ=32, 8-bit
+                shared scale) as a 昀椀rst-class member of the candidate set. We evaluate three instantiations to attribute observed gains to
+                the admissibility rule, the on-hardware MX candidates, and the paper-proposed MXFP16 candidate: (i) Ladder IEEE
+                (FP8, FP16, FP32, FP64) restricted to the baseline’s precision tiers; (ii) Ladder MX (MXFP4, MXFP8, FP16, FP32, FP64)
+                that adds the OCP-standardized sub-byte MX candidates supported by native Blackwell MMAs; and (iii) Ladder MX +
+                MXFP16 (MXFP4, MXFP8, MXFP16, FP32, FP64), where MXFP16 is our extension of the OCP MX block-scaled design to
+                16-bit elements, executed via TF32 tensor cores.
+                  Experiments on symmetric positive de昀椀nite Matérn covariance matrices with weak correlation, representative of
+                scienti昀椀c applications such as climate modeling, on a single NVIDIA GB200 GPU demonstrate that the ladder tracks
+                the user-requested tolerance ÿ closely across all tested matrix sizes and tolerances, whereas the baseline rule of [17]
+                can silently overshoot ÿ by more than an order of magnitude (up to ∼60×) where under昀氀ow dominates the actual
+                error4turning ÿ from a heuristic guideline into a reliable target. The three instantiations di昀昀er in the cost of delivering
+                this accuracy guarantee: Ladder IEEE pays for it in throughput, since both FP8 and FP16 tiles are promoted to FP32 once
+                the under昀氀ow contribution becomes visible, eliminating the cheap tiers the baseline relied on; Ladder MX recovers
+                Manuscript submitted to ACM
+                    Error-Controlled MxP Cholesky Factorization with Microscaling                                                 3
+                    the FP8 tiles via MXFP4 and MXFP8, but the originally-FP16 tiles still escalate to FP32 since no mid-tier candidate sits
+                    between MXFP8andFP32;LadderMX+MXFP16addsthatmid-tiercandidatetocatchthoseFP16tilesback,delivering
+                    upto1.79×speedupoverLadderIEEEalone(155.6vs87.0TFLOPSatĊ=120k,ÿ=10−5)andreducingmemoryfootprint
+                    byroughly30%whilematchingthebaseline’speakfactorizationthroughput.Together,thesecomparisonshighlightthat
+                    error-controlled tile assignment and block-scaled representation are complementary: the ladder decides which precision
+                    a tile can tolerate, while block scaling decides how accurately that precision represents the data, and neither alone
+                    delivers both safety and speed. To our knowledge, this is the 昀椀rst study to evaluate MX formats (down to MXFP4) as
+                   working storage-and-compute precisions in dense matrix factorization. The implementation, extending the out-of-core
+                    tile Cholesky framework of [17], is available at https://github.com/accl-kaust/ooc-cholesky-mx.
+                      The remainder of the paper is organized as follows. Section 2 reviews related work in mixed-precision linear
+                    algebra, tile-based precision assignment, and block-scaled formats. Section 3 presents the error-controlled ladder
+                    algorithm with its rounding-plus-under昀氀ow admissibility test, the MX quantization procedure, and the evaluation
+                    metrics. Section 4 reports experiments on a single NVIDIA GB200 GPU covering tile allocation, accuracy, memory
+                    footprint, and throughput. Section 5 concludes and outlines future directions.
+                    2 BackgroundandBaselineFramework
+                    2.1  MixedPrecisioninDenseLinearAlgebra
+                    Mixed-precision algorithms have long been studied in high-performance computing (HPC) as a mechanism to reduce
+                    memoryfootprint and increase arithmetic throughput while preserving numerical accuracy. Two recent surveys frame
+                    the 昀椀eld: Abdelfattah et al. [1] review numerical linear algebra methods utilizing mixed-precision arithmetic across
+                    sparse and dense workloads, while Higham and Mary [11] provide a uni昀椀ed theoretical treatment of mixed-precision
+                    algorithms with an emphasis on rounding-error analysis and the conditions under which low-precision storage and
+                    computation are numerically safe. Building on this framework, Mary and Mikaitis [14] extend the analysis to narrow-
+                    rangelow-precisionformats(FP8andbelow,downtoFP4),wherethesmalldynamicrangemakesunder昀氀owa昀椀rst-order
+                    concern alongside rounding; their disjoint rounding-plus-under昀氀ow decomposition forms the basis of our tile-centric
+                    admissibility criterion in Section 3.1.
+                      Several works have investigated mixed precision in core linear algebra kernels. Zhang et al. [22] study GEMM
+                    operations using double and single precision in hardware-aware settings. Reliability aspects of mixed precision across
+                    HPCworkloads are analyzed by Netti et al. [15], who note that half precision remains relatively underutilized in
+                    scienti昀椀c applications compared to single and double precision. GPU-oriented optimizations for linear solvers using
+                    mixedprecision,includingiterativere昀椀nementstrategieswithFP16,areexploredbyHaidaretal.[10].TheuseofTensor
+                    Cores for accelerating Cholesky factorization in half precision is investigated by Abdelfattah et al. [2], demonstrating
+                    performance gains while maintaining acceptable numerical stability through re昀椀nement techniques.
+                    2.2  Tile-Based Precision Assignment in Cholesky
+                    Tile-based decompositions enable 昀椀ne-grained precision assignment, allowing di昀昀erent tiles to be stored and computed
+                    at varying bit widths based on conditioning or error sensitivity. Two prior approaches are the most directly relevant
+                    comparators for this work.
+                      Closest in spirit, Carrica et al. [6] combine recursive Cholesky on NVIDIA and AMD matrix engines with a per-block
+                    scalar rescaling around each FP16 GEMM. This anticipates block-scaled execution, but the scaling is an external scalar
+                                                                                                            Manuscript submitted to ACM
+                             4                                                                 Abdurakhmanov,Mary,Ltaief, Keyes, and Fahmy
+                             wrapping an IEEE FP16 block rather than a hardware-portable format with a shared exponent applied at 昀椀xed-size
+                             element blocks, and precision is assigned by recursion-tree position rather than a tile norm-based rounding-error test.
+                                Renetal. [17] extend mixed-precision Cholesky factorization to FP8 in the out-of-core setting and demonstrate that
+                             certain applications exhibit tolerance to aggressive precision reduction. We take this work as our baseline framework.
+                             Its tile-classi昀椀cation rule applies a single-threshold test on rounding error against a user tolerance ÿ and is invariant
+                             to the under昀氀ow contribution4a fragility that can let the actual factorization error exceed the requested ÿ by more
+                             than an order of magnitude at loose tolerances where FP8 under昀氀ow is non-negligible. The error-controlled ladder is
+                             designed to close this gap.
+                                While prior mixed-precision approaches rely on IEEE formats (FP16, FP32, FP64)4and where scaling appears, it is a
+                             single external scalar wrapping an IEEE block4none combine a per-tile rounding-plus-under昀氀ow admissibility rule
+                             with hardware-portable block-scaled candidate formats in dense scienti昀椀c factorizations. This is the gap that our work
+                             addresses.
+                             2.3   Block-Scaled Formats
+                             Sharing a 昀氀oating-point exponent across a group of values is a long-standing idea [21], with modern instantiations
+                             including Microsoft’s MSFP [8] and Block Mini昀氀oat [9]. These schemes reduce storage and hardware complexity, but
+                             a single shared exponent is sensitive to outliers: every element in a block must conform to it without per-element
+                             adjustment. This sensitivity intensi昀椀es as element bit-widths shrink4from FP16’s tens of binades of dynamic range,
+                             to FP8’s handful, to FP4’s mere few4making block-scaled construction not merely a memory optimization but a
+                             representational necessity at sub-byte widths.
+                                The Microscaling (MX) speci昀椀cation, an Open Compute Project (OCP) standard [18, 19], re昀椀nes this design by
+                             combining a per-element microscale exponent with a shared 8-bit scale over 昀椀xed 32-element blocks, reducing clipping
+                             risk and improving robustness to intra-block dynamic-range variation. Initial machine learning evaluations show that
+                             sub-byte MX formats can replace FP32 with minimal accuracy loss.
+                                Hardwaresupportnowspanscommercialaccelerators (NVIDIA Blackwell, AMD MI300) as well as FPGA datapath
+                             designs for MX [5, 20] and ASIC precision-scalable MACs supporting the full MX family [7].
+                                While MXhasbeenextensively evaluated in deep learning, its implications for structured dense scienti昀椀c computa-
+                             tions remain largely unexplored. This work integrates MX as a 昀椀rst-class candidate in the precision-assignment ladder
+                             of Section 3.1.
+                             3 Methodology
+                             This section describes the per-tile precision-assignment methodology developed in this paper. We begin with the
+                             error-controlled ladder itself (Section 3.1), the algorithmic centerpiece. Once a precision is selected for a tile, the tile is
+                             quantized to the chosen format as described in Section 3.2. Section 3.3 de昀椀nes the metrics used for evaluation.
+                                Throughout this section, the error analysis concerns the representation of tiles in a target format4the perturbation
+                             incurred when data is stored4and not the errors introduced by subsequent arithmetic on those tiles. The admissibility
+                             criterion, the ladder, and the scaling discussion below are all statements about stored values.
+                             3.1   Error-Controlled Ladder Assignment
+                             This subsection presents the per-tile precision-assignment rule that replaces the rounding-only test of prior tile-centric
+                             mixed-precision frameworks with a combined rounding-plus-under昀氀ow admissibility test. The development follows the
+                             Manuscript submitted to ACM
+                      Error-Controlled MxP Cholesky Factorization with Microscaling                                                             5
+                                                          MIXED-PRECISION QUANTIZATION · PER-TILE LADDER                     Tiled Â
+                                                                                                   × N(N+1)/2 tiles
+                                  Matrix A                      Double · fallback
+                                                           5    FP64 (no quantization)                      ✓
+                                 FP64 reference
+                                                       ✗
+                                   Tiled A                      Single
+                                                           4    FP32                                        ✓
+                                                       ✗                                                                   Le昀琀-looking
+                                                                Half
+                                                           3    MXFP16                                      ✓               Cholesky
+                                                       ✗                                                                   factor Â ≈ L Lᵀ
+                                                                MXFP8
+                                                           2    MXFP8                                       ✓
+                               symmetric · lower-tri   ✗
+                                 N(N+1)/2 tiles                 MXFP4 · try 昀椀rst
+                                                           1    MXFP4                                       ✓
+                      Fig. 1. Methodology pipeline (Ladder MX + MXFP16 instantiation shown). Input matrices are passed through the per-tile precision-
+                      assignment ladder (Algorithm 1), quantized to the selected precision, and factorized by a le昀琀-looking Cholesky; the result is evaluated
+                      against an FP64 reference. Other ladder instantiations use the same workflow with di昀昀erent candidate sets.
+                      error model in [14], adapted here to the tile-centric mixed-precision factorization setting. Figure 1 situates the ladder
+                      within the surrounding pipeline.
+                                                                                      ģ×Ĥ
+                      3.1.1  Error Model. Let ý denote the global matrix and þ ∈ R         one of its tiles. We consider a target storage format
+                                                                                             ěmin              ěmax
+                      with unit roundo昀昀 ī and exponent range [ěmin,ěmax]. Let Ĝmin = 2          and Ĝmax = 2      (2 − 2ī). Any element with
+                      magnitudein [Ĝ     , Ĝ  ] is representable in the target format with relative accuracy at leastī; elements with magnitude
+                                      min  max
+                      above Ĝ    over昀氀ow and elements with magnitude below Ĝ         under昀氀ow. The error analysis that follows treats over昀氀ow
+                             max                                                  min
+                      as inadmissible (the ladder of Section 3.1.4 unconditionally rejects any candidate at which a scaled magnitude exceeds
+                      Ĝ   ) and bounds under昀氀ow as a contribution to the per-tile error. Table 1 lists these parameters for the formats
+                       max
+                      considered in this paper. Two under昀氀ow modes are in common use:
+                          • Flush-to-zero (FZ): any Į with |Į| < Ĝ         is replaced by 0 or ±Ĝ    , introducing an absolute error of at most
+                                                                       min                       min
+                             min(|Į|, Ĝmin/2).
+                          • Gradualunder昀氀ow(GU):anyĮ with |Į| < Ĝmin isreplacedbythenearestsubnormal;subnormalsareuniformly
+                             spaced by 2ī Ĝmin, so the absolute error is at most min(|Į|,ī Ĝmin).
+                      For a uni昀椀ed statement we de昀椀ne                        
+                                                                               
+                                                                       ĝmin = Ĝmin/2    (FZ)                                                (1)
+                                                                               
+                                                                               
+                                                                                ī Ĝmin    (GU)
+                                                                               
+                      so that the under昀氀ow error on any single element is bounded by min(|Į|,ĝmin). All experimental results in Section 4 use
+                      GU,whichisthemodeimplementedbycurrenthardware(includingNVIDIABlackwell)fortheformatsweevaluate;
+                      the framework analysis below applies to either mode.
+                        For a scalar Į whose 昀氀oating-point representation 昀氀(Į) does not over昀氀ow, the rounding and under昀氀ow errors
+                      satisfy [14]
+                                              昀氀(Į) = Į(1 +���㗿) +ā,       |���㗿 | f ī,    |ā| f min(|Į|,ĝmin),      ���㗿ā = 0,                     (2)
+                                                                                                                        Manuscript submitted to ACM
+                                                6                                                                                                          Abdurakhmanov,Mary,Ltaief, Keyes, and Fahmy
+                                                wherethedisjointness���㗿ā = 0 encodes the fact that an element either rounds or under昀氀ows but not both. Applying (2)
+                                                elementwise to a tile þ yields
+                                                                                             昀氀(þ) = þ + ā + Ă,                   |ā| f ī|þ|,             |Ă| f min(|þ|,ĝminĆ),                                                      (3)
+                                                                                                                                                                     ģ×Ĥ
+                                                with the inequalities and the minimum applied componentwise, and Ć ∈ R                                                       the matrix of ones.
+                                                3.1.2      Admissibility Criterion. Following [11], we say a tile þ is admissible in the target format at relative tolerance ÿ if
+                                                                                                                              ∥ā +Ă∥ f ÿ ∥ý∥,                                                                                        (4)
+                                                wherethenormistheFrobeniusnorminourimplementation(theanalysis carries over to any monotone matrix norm
+                                                with adjusted constants). The triangle inequality gives the su昀케cient condition ∥ā∥ + ∥Ă∥ f ÿ∥ý∥, which we adopt as
+                                                the working criterion. The criterion is normwise by design: it measures the per-tile perturbation against the global
+                                                norm ∥ý∥, following the relative-tolerance formulation of [11], which is what makes a single tolerance ÿ meaningful
+                                                across tiles of widely di昀昀ering norms.
+                                                    The rounding term admits the standard a priori bound ∥ā∥ f ī ∥þ∥. When ∥Ă∥ = 04i.e., when no elements
+                                                under昀氀ow4this collapses to the classical criterion ī ∥þ∥ f ÿ ∥ý∥ used by the baseline [17]. The under昀氀ow term,
+                                                                                                                                                                                  √
+                                                however, is not dominated byī ∥þ∥ in general. A uniform a priori bound is ∥Ă∥ f                                                      ģĤĝmin, but this is pessimistic: it
+                                                chargesĝmin to every entry of the tile regardless of whether it actually under昀氀ows. For wide-range formats (FP32 and
+                                                                                                                                                                                                    √
+                                                FP64) and for GU-mode arithmetic, the rounding-only criterion is typically su昀케cient because                                                           ģĤĝmin jī∥þ∥.For
+                                                                                                                                                                                               √
+                                                narrow-range formats (FP8 and below), and especially in FZ mode, the inequality reverses4 ģĤĝmin can substantially
+                                                exceedī ∥þ∥4andtherounding-only test admits tiles that the combined criterion would reject.
+                                                    Torecover sharpness while keeping the cost manageable, we replace the uniform bound on ∥Ă∥ with an entrywise
+                                                scan: an entry (ğ, Ġ) contributes to Ă only if its scaled magnitude falls below Ĝmin, and the contribution is bounded by
+                                                                                                         √
+                                                min(|þğĠ|,ĝmin). This is tighter than                       ģĤĝmin by exactly the factor needed to ignore non-under昀氀owing entries.
+                                                3.1.3      E昀昀ect of Scaling. Let Ĕ = {Į1,...,Įġ} denote a 32-element MX block sharing a common scaling factor. The
+                                                optimal choice of scale factor is [14]
+                                                                                                                  ĩ★ = Ĝmax ,              Į       = max |Į |,                                                                       (5)
+                                                                                                                           Įmax              max       ğ=1,...,ġ   ğ
+                                                whichprevents over昀氀ow and minimizes under昀氀ow. With this scale, the under昀氀ow error on any element Įğ becomes
+                                                                                                        |āğ| f min|Įğ|, ĝmin  = min|Įğ|, ĝminĮmax  .                                                                             (6)
+                                                                                                                                   ĩ★                              Ĝ
+                                                                                                                                                                    max
+                                                Comparing(6) with the unscaled bound in (2), scaling reduces the under昀氀ow contribution by the factor Į                                                                   /Ĝ       <1.
+                                                                                                                                                                                                                     max     max
+                                                Twoconsequencesfollow. First, scaling reduces both the number of under昀氀owing elements and the absolute error per
+                                                under昀氀ow. Second, the gain is largest when Įmax is small, which means that grouping elements of similar magnitude
+                                                under a shared scale is preferable to grouping arbitrarily4motivating MX’s 昀椀xed 32-element block size. In fact, in an
+                                                ideal scenario where all the elements have about the same magnitude |Įğ| ≈ Įmax, (6) yields a relative error of order
+                                                ĝ      /Ĝ      , which is negligible compared with the rounding errors of orderī for all 昀氀oating-point formats of interest.
+                                                  min     max
+                                                    Equation (5) gives the unconstrained optimum. The OCP MX speci昀椀cation restricts the shared scale to the E8M0
+                                                encoding4an8-bit biased exponent with no mantissa4so the applied scale is the largest power of two that aligns the
+                                                block maximumwiththeexponentoftheformat’slargest normal:
+                                                                                                                  ěelem−+log Įmax,                  elem
+                                                                                                         Ă =2 max              2         ,        ě       =+log Ĝ            ,,                                                      (7)
+                                                                                                                                                   max              2 max
+                                                Manuscript submitted to ACM
+                         Error-Controlled MxP Cholesky Factorization with Microscaling                                                                                   7
+                         Algorithm1Error-Controlled ladder for per-tile precision assignment.
+                                                    ģ×Ĥ
+                         Require: Tile þ ∈ R             ; relative tolerance ÿ; global norm ∥ý∥; ordered candidate list P (cheapest 昀椀rst). For each
+                              candidate Ħ, the scale mapĩĦ(·,·) of its quantizer (Section 3.2): ĩĦ ≡ 1 for unscaled IEEE candidates, and ĩĦ(ğ, Ġ) = Ă
+                              of (7) for MX candidates, constant within each ġ=32 block.
+                         Ensure: Selected (precision, scaling) pair Ħ★.
+                           1: nrmB ← ∥þ∥
+                           2: ă ← ÿ · ∥ý∥                                                                                              ² absolute target on ∥ā + Ă∥
+                           3: for all Ħ ∈ P in ascending order of storage cost do
+                           4:      ī ←unitroundo昀昀ofĦ
+                           5:      Ĝmin, Ĝmax ← smallest and largest normal of Ħ
+                           6:      ĝmin ←asinEquation(1) (FZ or GU as appropriate)
+                           7:      nrmE←ī·nrmB                                                                                      ² rounding bound, ∥ā∥ fī∥þ∥
+                           8:      Ă ←0         ;  ovf ← false
+                                           ģ×Ĥ
+                           9:      for (ğ, Ġ) = 1:ģ, 1:Ĥ do                                                                 ² entrywise scan; ĩĦ ≡ 1 if Ħ unscaled
+                          10:           if ĩ (ğ, Ġ) · |þ  | > Ĝ     then
+                                            Ħ           ğĠ     max
+                          11:               ovf ← true                                                                          ² over昀氀ow: candidate inadmissible
+                          12:           else if ĩ (ğ, Ġ) · |þ   | < Ĝ     then
+                                                  Ħ           ğĠ     min        
+                          13:               ĂğĠ ← min |þğĠ|, ĝmin/ĩĦ(ğ, Ġ)
+                          14:           endif
+                          15:      endfor
+                          16:      nrmF ← ∥Ă∥
+                          17:      if ¬ovf and nrmE+nrmF fă then
+                          18:           returnĦ                                                                                           ² 昀椀rst admissible tier wins
+                          19:      endif
+                          20: end for
+                          21: return highest-cost candidate in P                                                                            ² safeguard fall-through
+                                                           ˜
+                         applied multiplicatively as Į = ĂĮ and stored as an unsigned 8-bit exponent with bias 127. Since Ă is an exact power of
+                         two, applying and removing it shifts only the exponent 昀椀eld and contributes no rounding error of its own; the bound
+                         of (6) therefore holds with ĩ★ replaced by Ă, degraded by at most a factor of two4the in-standard cost of a shared
+                         exponent carrying no mantissa. We note that the optimal scale (5) is de昀椀ned with respect to representation alone;
+                         scaling a matrix so that subsequent products do not over昀氀ow is a related but distinct problem [12].
+                             In the ladder algorithm below, we extend (6) to allow the scale to vary across the tile, writing ĩĦ(ğ, Ġ) for the scale
+                         that candidate Ħ applies to entry (ğ, Ġ). For MX candidates, ĩĦ(ğ, Ġ) = Ă of (7), constant within each 32-element block;
+                         for unscaled IEEE candidates, ĩĦ ≡ 1 and the bound reduces to (2). The admissibility test inherits this generality.
+                         3.1.4    TheLadderAlgorithm. Given a tile þ, a relative tolerance ÿ, the global norm ∥ý∥, and an ordered candidate list P
+                         of (precision, scaling) pairs sorted from cheapest to most expensive in storage cost, we walk P from the bottom and
+                         return the 昀椀rst candidate satisfying the admissibility criterion. Pseudocode is given in Algorithm 1.
+                             Weevaluatethree instantiations of the ladder, each de昀椀ned by its candidate list. We refer to them throughout the
+                         paper by the short names used in 昀椀gures:
+                               • LadderIEEE: P = (FP8 E4M3, FP16, FP32, FP64). Restricted to the same precision tiers as the baseline [17],
+                                  this isolates the contribution of the rounding-plus-under昀氀ow admissibility test from the contribution of the
+                                  expanded MXcandidate set.
+                                                                                                                                             Manuscript submitted to ACM
+                                   8                                                                             Abdurakhmanov,Mary,Ltaief, Keyes, and Fahmy
+                                   Table 1. Parameters of the formats used in this paper. Ī is the significand precision including the implicit bit, ī = 2−Ī the unit
+                                   roundo昀昀, Ĝ    the smallest positive normal, Ĝ    the largest normal, and ěelem = +log Ĝ     , the exponent used by the applied scale
+                                              min                                max                           max        2 max
+                                   of (7). The MX variants share the element parameters of their unscaled counterparts and di昀昀er only in the shared block scale, which
+                                   enlarges the e昀昀ective dynamic range without changingī.
+                                                Format              Ī               ī               Ĝ               Ĝ      ěelem    Scale            bits/elt
+                                                                                                     min             max     max
+                                                FP64               53   1.11 × 10−16     2.23 × 10−308     1.80 × 10308     1023    4                     64
+                                                FP32               24    5.96 × 10−8      1.18 × 10−38      3.40 × 1038      127    4                     32
+                                                FP16               11    4.88 × 10−4       6.10 × 10−5       6.55 × 104       15    4                     16
+                                                FP8 E4M31           4    6.25 × 10−2       1.56 × 10−2       4.48 × 102         8   4                      8
+                                                MXFP162            11    4.88 × 10−4       6.10 × 10−5       6.55 × 104       15    E8M0,ġ=32          16.25
+                                                MXFP8E4M31          4    6.25 × 10−2       1.56 × 10−2       4.48 × 102         8   E8M0,ġ=32           8.25
+                                                MXFP4E2M1           2    2.50 × 10−1               1.00             6.00        2   E8M0,ġ=32           4.25
+                                                  1                                                                                          ěmax
+                                                    E4M3reservesitslargestmantissacodeforNaN,so Ĝmax = 448ratherthanthe2                          (2−2ī) =
+                                                    480 given by the general expression in Section 3.1.1.
+                                                  2 Paper-proposed extension of the OCP MX family to 16-bit elements (Section 3.1.4).
+                                        • Ladder MX: P = (MXFP4, MXFP8E4M3, FP16, FP32, FP64). Adds the OCP-standardized sub-byte MX
+                                           candidates (MXFP4, MXFP8 E4M3) that are supported by native block-scaled MMAs on Blackwell. Used to
+                                           characterize performance under fully on-hardware execution.
+                                        • Ladder MX + MXFP16: P = (MXFP4, MXFP8E4M3, MXFP16, FP32, FP64). Further admits MXFP16, a
+                                           paper-proposed extension of the OCP MX speci昀椀cation beyond its sub-byte formats: a 16-bit element with a
+                                           shared 8-bit block scale over ġ = 32 contiguous elements.
+                                      Weinitially considered MXFP8 E5M2 and MXFP6 (E2M3 and E3M2 variants) as additional candidates in Ladder
+                                   MX+MXFP16,exploringdi昀昀erent exponent allocations within the MX format family. The admissibility test rarely
+                                   selected these tiers for the Cholesky tiles studied here: MXFP6 sat at intermediate accuracy below MXFP8 E4M3, and
+                                   MXFP8E5M2wasdominatedbyMXFP8E4M3underthedynamicrangesweencountered.Weomitthemfromthe昀椀nal
+                                   candidate list and report all results using the three instantiations above.
+                                      IEEE and scaled variants appear as peer candidates rather than as a primary/fallback pair: a tile may be admitted at
+                                   MXFP8evenifitwouldalsobeadmittedatFP16,providedMXFP8sitsearlierin P andits admissibility test passes. The
+                                   ordering within P encodes the storage-cost preference.
+                                      OnemightaskwhytheladderdoesnotscaletheIEEEcandidatesdirectlytoavoidover昀氀ow.ScalinganIEEEtiledoes
+                                   not leave it an IEEE tile: the scale must be stored alongside the data and reapplied on every read, which is precisely
+                                   whattheMXcandidatesalreadyprovide, with native hardware support.
+                                      Tocomparetheper-tile precision assignments produced by the ladder against those of the baseline rule of [17], we
+                                   evaluate both at matched relative tolerance ÿ. The ladder may promote tiles that the rounding-only rule admitted to
+                                   FP8 because the under昀氀ow contribution at FP84hidden from the baseline test4becomes visible and pushes ∥ā∥ + ∥Ă∥
+                                   above the threshold. The resulting allocations, factorization error, memory footprints, and throughputs across the three
+                                   instantiations are reported and analyzed in Section 4.
+                                   3.1.5   Properties.
+                                      Safety. By construction, the returned Ħ★ satis昀椀es ∥ā∥ + ∥Ă∥ f ÿ∥ý∥, hence ∥昀氀 ★(þ) − þ∥ f ÿ∥ý∥ by the triangle
+                                                                                                                                 Ħ
+                                   inequality applied to (3). The ladder is therefore conservative with respect to the relative-tolerance criterion of [11]. We
+                                   Manuscript submitted to ACM
+                    Error-Controlled MxP Cholesky Factorization with Microscaling                                                      9
+                    emphasize that this bound governs the per-tile representation error, whereas the metric reported in Section 3.3 and used
+                                                                                              Đ
+                    to evaluate accuracy in Section 4 is the relative factorization error ∥ý − ĈĈ ∥∞/∥ý∥∞4a global quantity that depends
+                    onhowper-tile errors propagate through the factorization. The theorem above does not bound the factorization error
+                    directly. Empirically, however, the two quantities track closely on the workloads we study: changing the candidate set
+                    (Ladder IEEE vs. Ladder MX + MXFP16) also moves the measured factorization error in the same direction, indicating
+                    that ÿ functions as an operationally useful target for the factorization error even though only the representation error is
+                    provably bounded by it.
+                       Toward a factorization-level bound. The bound above governs the per-tile representation error. A bound on the
+                    factorization error would additionally have to account for how those perturbations propagate, and for the arithmetic
+                    itself, which is likewise mixed: each update is carried out at a precision determined by the tiles involved rather than at
+                    a single working precision. This would require a backward-error result for tile Cholesky with per-tile unit roundo昀昀,
+                    control of the growth of intermediate quantities4the ladder assigns precisions once, from the norms of the input
+                    tiles4and a choice of dimensional constant, where the deterministic worst case grows linearly in the accumulation
+                    length while the probabilistic model of [11] grows with its square root, at the cost of a high-probability rather than
+                    deterministic guarantee. Beyond that constant, the factorization error depends on the conditioning of ý and on the
+                    distribution of tile norms. Cholesky is the favourable case, being unconditionally stable and pivot-free, but a rigorous
+                    boundinthemixed-precision-arithmetic setting remains open and we do not claim one here.
+                                                           √
+                       Recovery of the baseline rule. When  ģĤĝmin jī∥þ∥ atallcandidate precisions4typical for FP32 and FP64 4the
+                    entrywise scan returns ∥Ă∥ ≈ 0 and the admissibility test reduces toī ∥þ∥ f ÿ∥ý∥. In this regime the ladder selects the
+                    same tile precision as the rounding-only rule of [17]. The two procedures diverge only when under昀氀ow becomes a
+                    non-negligible fraction of the total error, which by construction is when divergence is numerically justi昀椀ed.
+                       Conservatism of the rounding term. The disjointness���㗿ā = 0 in (2) means an entry that under昀氀ows incurs no rounding
+                    error. Algorithm 1 nonetheless evaluates the rounding bound asī ∥þ∥ over the whole tile, including entries counted in
+                    Ă, and is therefore conservative: the sharper bound restricts the norm to the non-under昀氀owing entries. Because those
+                    entries are by construction the smallest in the tile4each bounded in magnitude by Ĝmin/ĩĦ(ğ, Ġ)4their contribution to
+                     ∥þ∥ is negligible relative to the entries that dominate it, and the re昀椀nement would tighten the admissibility test by
+                    a correspondingly negligible margin. We retain the simpler form, noting that the resulting bound errs on the side of
+                    safety.
+                       Cost relative to the baseline. The baseline rule applies a single rounding test per tier. Because ∥þ∥ is precision-
+                    independent, it is computed once per tile and reused across tiers, giving an overall pre-analysis cost of O(ģĤ) per
+                    tile. The ladder performs additional work at each tier. For every candidate, an entrywise under昀氀ow scan visits allģĤ
+                    entries to evaluate the ∥Ă∥ contribution under the candidate’s Ĝ    andĝ    . For IEEE candidates, an over昀氀ow check
+                                                                                    min      min
+                    additionally compares the tile’s maximum magnitude against the candidate’s Ĝmax, which is O(1) per tier once ∥þ∥∞
+                    is precomputed. For scaled candidates, over昀氀ow is structurally prevented by the applied scale of (7); the per-region
+                    maximaĮmaxunderlyingthescaleareprecision-independentandcomputedoncepertileinO(ģĤ).Thepre-analysiscost
+                    therefore rises from O(ģĤ) to O(|P| ·ģĤ) per tile, a factor-|P| asymptotic increase in the dominant term. The constant
+                    factors are non-trivial in practice: scaled candidates require per-region scale derivation and per-block quantization that
+                    IEEE-only 昀氀ows do not, and the per-entry scan involves conditional logic at each tier. Aggregated over the matrix, the
+                    pre-analysis is O(|P| Ċ2) against O(Ċ3) factorization, so the relative overhead shrinks with Ċ.
+                                                                                                                 Manuscript submitted to ACM
+                              10                                                                  Abdurakhmanov,Mary,Ltaief, Keyes, and Fahmy
+                                                                            FP64     FP32    MXFP16     MXFP8     MXFP4      Scale factor
+                                                                                MX Scaled Tile                    Single MX block
+                                                                                                                              k = 32
+                              Fig. 2. Visualization of mixed-precision Cholesky factorization with MX scaling. Le昀琀: lower-triangular SPD matrix with per-tile
+                              precision assignment from the ladder of Section 3.1; tiles are encoded at FP64, FP32, MXFP16, MXFP8, or MXFP4 (color-coded).
+                              Middle: an MX-scaled tile is partitioned into fixed blocks of ġ=32 contiguous elements, with the corresponding shared E8M0 scale
+                              factors (red)4an 8-bit biased exponent per block3 stored as a separate metadata array. Right: detail of a single MX block4ġ=32
+                              elements with one shared scale, following the OCP MX specification [19].
+                              3.2   儀甀antization
+                              OncetheladderofSection3.1hasselected a precision for a tile, the tile is quantized as follows. For each 32-element MX
+                              block (Figure 2), the shared scale is Ă of (7), computed from the block maximum Į    =max       |Į|, where R denotes
+                                                                                                   ˜           max        Į∈R
+                              the set of elements in the block. Each element Į ∈ R is normalized as Į = ĂĮ and quantized to the target 昀氀oating-point
+                              format by round-to-nearest, saturating at the format’s maximum normal magnitude.
+                                 Thescaleisstoredasanunsigned8-bitexponentwithbias127inaseparatemetadataarray,followingtheOCPE8M0
+                              encoding, and reapplied on reconstruction. Because Ă is an exact power of two, applying and removing it shifts only
+                              the exponent 昀椀eld and introduces no rounding error of its own: the quantization error is entirely that of the element
+                              format. Unscaled IEEE candidates are quantized directly, with no scale (ĩĦ ≡ 1 in Algorithm 1). The admissibility scan of
+                              Algorithm 1 uses the same scale rule as the quantizer, so every entry is tested against the scale it will actually receive.
+                                 Weusetwoexecutionmodes,eachservingadistinct purpose. For accuracy analysis, all scaled formats are evaluated
+                              via software emulation: MXFP16, MXFP8, and MXFP4 are quantized by value under the same scale rule (7) andġ=32
+                              block partition as the native path, with the quantized values carried in FP32 containers rather than packed low-precision
+                              words. Quantized values propagate through the factorization exactly as they would on hardware: arithmetic and
+                              accumulation are carried out in FP32 under both modes, updates accumulate in FP32 within an operation, and tiles are
+                              returned to their assigned format once each panel operation completes. The two modes therefore di昀昀er in the physical
+                              representation of the operands and in the order of accumulation within each product, not in the precision at which
+                              values are held or summed. The memory footprints reported in Section 4.4 are computed analytically from the per-tile
+                              format assignment using the cost model of Section 3.3, and therefore re昀氀ect native packed storage rather than the
+                              emulation containers.
+                                 For performance evaluation, we execute on real hardware. The MX formats with native Blackwell MMA support4
+                              MXFP4andMXFP8E4M34runontheGB200tensorcoresdirectly.MXFP16,thepaper-proposedextensionofOCPMX
+                              beyondits standardized sub-byte formats (Section 2.3), runs via TF32 tensor cores, which provide higher throughput
+                              than FP32 while preserving the dynamic range needed to absorb the MXFP16 block scale. FP16, FP32, and FP64 use
+                              their standard cuBLAS code paths.
+                              Manuscript submitted to ACM
+                    Error-Controlled MxP Cholesky Factorization with Microscaling                                                 11
+                      Operations between tiles of di昀昀erent formats. A tile’s format is 昀椀xed by the ladder assignment and does not change
+                    during the factorization, so an update may combine operands stored at di昀昀erent precisions. Following the baseline
+                    framework [17], mixed operands are promoted to the higher of the two formats before the operation, and the result is
+                    returned to the destination tile’s assigned format once the panel operation completes. For MX operands, promotion
+                    dequantizes each block by its shared scale, so the promoted values carry the precision of the format they were stored
+                    in rather than that of the compute type. The native block-scaled tensor-core path (Section 4.1) is taken when both
+                    operands share an MX format.
+                    3.3  Evaluation Metrics
+                    Weevaluate all con昀椀gurations along three axes: factorization accuracy, storage cost, and performance.
+                      Factorization error. The factorization accuracy of a con昀椀guration is measured by the relative factorization error in
+                    the matrix in昀椀nity norm:
+                                                                              Đ
+                                                                      ∥ý−ĈĈ ∥∞,
+                                                                         ∥ý∥∞
+                    whereĈ is the Cholesky factor produced by the mixed-precision factorization and ý is the FP64 reference matrix.
+                      Memory footprint. Because the input matrices are symmetric positive de昀椀nite, we account only for the lower-
+                    triangular portion of the factorization4the upper triangle is implicit. Diagonal tiles are always assigned to FP64 in our
+                    setup, both as a numerical stability measure for the in-place POTRF operation and to ensure the diagonal contribution
+                    to the factorization error is exact; block quantization considerations therefore apply only to o昀昀-diagonal tiles. Storage
+                    cost is reported at each tile’s native format bit-width. For an o昀昀-diagonal tile Ī of size Ĥ ×Ĥ assigned to a format with
+                                                                                                      Ę    Ę
+                    Ę bits per element, divided intoĝ scale regions ofĘ bits each, the per-tile cost is
+                     Ī                              Ī                 ĩ
+                                                                  Ĥ2 ·Ę +ĝ ·Ę     bits,
+                                                                   Ę   Ī   Ī   ĩ
+                    andthetotal memory across allĐ tiles in the lower triangle (o昀昀-diagonal at the selected ladder precision, diagonal at
+                    FP64) is
+                                                             Đ
+                                                            ∑ᄁ  2                           ĉbits
+                                                     ĉ =        Ĥ ·Ę +ĝ ·Ę ,         ĉ =           .
+                                                      bits       Ę   Ī   Ī   ĩ         GB   8×109
+                                                            Ī=1
+                      Performance. We report factorization throughput in TFLOPS on a single NVIDIA GB200 GPU; experimental setup,
+                    including the Baseline reference point we measure against, is detailed in Section 4.
+                    4 Results
+                    This section presents the empirical evaluation of the error-controlled ladder against the rounding-only baseline of [17].
+                    We begin with the setup (Section 4.1), then characterize the ladder’s tile-allocation behavior (Section 4.2) as the
+                    mechanismthat underlies every subsequent claim. The allocation determines accuracy (Section 4.3), memory footprint
+                    (Section 4.4), and throughput (Section 4.5), reported in that order.
+                    4.1  ExperimentalSetup
+                      Hardware. Performance results in this section are obtained on a single NVIDIA GB200 superchip GPU. The ladder’s
+                    candidate set spans formats with diverse hardware paths: MXFP4 and MXFP8 E4M3 execute on Blackwell’s native
+                    block-scaled tensor cores, MXFP16 runs via the TF32-based GEMM, and FP16 and FP32 use their standard cuBLAS code
+                                                                                                              Manuscript submitted to ACM
+                                   12                                                                             Abdurakhmanov,Mary,Ltaief, Keyes, and Fahmy
+                                                              FP64        FP32       FP16        MXFP16         FP8 plain       MXFP8         MXFP4
+                                                                                                                             27
+                                                                                                                                                            28
+                                                                                             26
+                                                              25
+                                                                                                                       ·=10
+                                                                                                                                                       ·=10
+                                                                                        ·=10
+                                                        ·=10
+                                        500
+                                        400
+                                        300
+                                        200
+                                      Tile count
+                                        100
+                                          0
+                                                 Base                           Base                            Base                           Base
+                                                             L. MX                          L. MX                           L. MX                          L. MX
+                                                      L. IEEE                        L. IEEE                        L. IEEE                         L. IEEE
+                                                                 L. MX+16                       L. MX+16                        L. MX+16                       L. MX+16
+                                   Fig. 3. Per-tile precision allocation at Ċ = 120k (Ĥ   =4096)for four target tolerances. Each cluster of four bars shows, le昀琀 to right:
+                                                                                       Ę
+                                   Baseline, Ladder IEEE, Ladder MX, Ladder MX + MXFP16. Stack contents (bo琀琀om-to-top): FP64, FP32, FP16, MXFP16, FP8 plain,
+                                   MXFP8,MXFP4.Thisisarepresentative example; the same qualitative trends hold across the tested range Ċ ∈ {20k,...,120k}.
+                                   paths. FP64 GEMM updates use the Ozaki scheme [16] since Blackwell omits native FP64 tensor cores; Ozaki applies
+                                   uniformly across all con昀椀gurations including the Baseline. Accuracy results are obtained from software emulation
+                                   following the protocol of Section 3.2.
+                                       Workload, sizes, and tolerances. We generate symmetric positive de昀椀nite Matérn covariance matrices using the
+                                   ExaGeoStat framework [4] under weak correlation (ÿ = 0.02627, smoothnessć = 0.5), which exhibit heterogeneous tile
+                                   normsappropriateforprecision-awaretiling.WeevaluatematrixsizesĊ from20kto120kwithĤ ∈ {2048,4096} tuned
+                                                                                                                                                 Ę
+                                   for GB200 throughput rather than inherited from [17], both satisfying the OCP MX block-size requirement (ġ=32 | Ĥ ),
+                                                                                                                                                                         Ę
+                                   andfour target tolerances ÿ ∈ {10−5,10−6,10−7,10−8}.
+                                       Con昀椀gurations. We compare four con昀椀gurations: Baseline (the rounding-only mixed-precision assignment of [17]:
+                                   FP64 →FP32→FP16→FP8,reimplementedonGB200),LadderIEEE (theladderrestrictedtothebaseline’s precision
+                                   tiers), Ladder MX (the ladder with the sub-byte MX candidates MXFP4 and MXFP8 E4M3), and Ladder MX + MXFP16
+                                   (the full ladder with MXFP16 in the middle tier via TF32 compute). All con昀椀gurations use gradual under昀氀ow (GU) by
+                                   default; throughput measurements use 4 CUDA streams per device.
+                                       Thetwoexecutionmodes(Section3.2) do not a昀昀ect the comparison across con昀椀gurations: the ladder produces the
+                                   per-tile assignment before any arithmetic occurs, so the allocation measured for accuracy is exactly the one executed
+                                   for throughput, and all four con昀椀gurations are evaluated through the same path in each mode.
+                                   4.2    Tile Allocation: What the Ladder Does
+                                   Webeginbycharacterizing the tile-allocation pattern produced by each con昀椀guration. The allocation is the mechanism
+                                   behind every subsequent result4accuracy, memory, throughput4and is illustrated in Figure 3 at Ċ = 120k as a
+                                   representative example; the same qualitative trends hold across the full Ċ ∈ {20k,...,120k} range.
+                                       TheBaseline follows the rounding-only rule of [17]: tiles whose rounding boundī∥þ∥ 昀椀ts within ÿ∥ý∥ are admitted
+                                   to the cheapest precision passing this test. At ÿ = 10−5 this admits a substantial FP8 population (249 tiles), with a smaller
+                                   share at FP16 (58) and FP32 (128), and a 昀椀xed FP64 contribution from diagonal tiles (30). As ÿ tightens, the cheapest tier
+                                   yields to higher precisions: by ÿ = 10−8 most tiles are at FP32 or above.
+                                   Manuscript submitted to ACM
+                       Error-Controlled MxP Cholesky Factorization with Microscaling                                                                  13
+                                                                                                                                source ·
+                                                1. Baseline     2. Ladder IEEE     3. Ladder MX      4. Ladder MX+MXFP16
+                                                                                                    27
+                                                                                                                                  28
+                                                                      26
+                                        25
+                                                                                               ·=10
+                                                                                                                             ·=10
+                                                                 ·=10
+                                   ·=10
+                               23
+                             10
+                               24
+                             10
+                               25
+                             10
+                               26
+                             10
+                               27
+                             10
+                               28
+                             10
+                          Relative factorization error
+                                      32k      40k     64k          32k      40k     64k          32k      40k     64k          32k     40k      64k
+                                         Matrix size  N                Matrix size  N                Matrix size  N                Matrix size  N
+                                                                 Đ
+                       Fig. 4. Relative factorization error ∥ý − ĈĈ ∥∞/∥ý∥∞ (log scale) for the four configurations at matrix sizes Ċ ∈ {32k,40k,64k} and
+                       tolerances ÿ ∈ {10−5,10−6,10−7,10−8}. Dashed gray line marks the requested ÿ.
+                          Switching to Ladder IEEE on the same precision tiers exposes what the rounding-only test had been hiding. The
+                       entrywise under昀氀ow scan reveals that many tiles incur a non-negligible under昀氀ow contribution, and the admissibility
+                       test pushes them upward. At ÿ = 10−5 the FP8 count drops from 249 to 177 and FP16 collapses from 58 to 3; both
+                       populations escalate to FP32, whose count grows from 128 to 2554a single-tier absorption of 127 additional tiles. The
+                       cost of enforcing the bound manifests as a visible mass shift upward, which Section 4.4 and Section 4.5 quantify as the
+                       corresponding memory and throughput cost.
+                          Introducing MX scaling at the lowest tiers (Ladder MX) reverses this upward shift. MXFP4 and MXFP8 share an 8-bit
+                       scale across each 32-element block, absorbing the local dynamic range that caused plain FP8 to fail the admissibility
+                       test. The lower-tier population recovers at sub-byte storage4at ÿ = 10−5, the combined MXFP4+MXFP8 count is 248,
+                       approximately matching the size of the Baseline’s FP8 population at the same (Ċ,ÿ). The crucial di昀昀erence is that the
+                       scaled formats satisfy the admissibility test that plain FP8 fails: the lower tier carries the same volume of tiles, but the
+                       shared scale makes each one numerically safe.
+                          Avacancyemergesatthemidtier.LadderMXplacesfewtilesatplainFP16:whenFP16’sunder昀氀owcontribution
+                       exceedstheper-tilebudget,theladderlacksascaledmid-tiercandidateandmustescalatethesetilestoFP32.Atÿ = 10−5,
+                       Ladder MX’s FP32 count grows from 128 (Baseline) to 187, absorbing tiles that Ladder MX could not safely admit at
+                       plain FP16. Extending the candidate set with MXFP16 (Ladder MX + MXFP16, fourth bar) 昀椀lls this gap: MXFP16’s
+                       per-block scale shrinks the under昀氀ow contribution at half precision, letting these tiles 昀椀t within the budget at scaled half
+                       precision. The mid-tier population recovers, tracking Baseline’s FP16 distribution closely across the tested tolerances.
+                          Theprogression Baseline → Ladder IEEE → Ladder MX → Ladder MX + MXFP16 thus traces a single arc: enforcing
+                       the rounding-plus-under昀氀ow bound 昀椀rst pushes tiles up the precision tiers (Ladder IEEE), and then scaled candidates at
+                       the same admissibility test pull them back down, ultimately reproducing the Baseline’s tile-count distribution at every
+                       tier (Ladder MX + MXFP16) while replacing plain FP8 with MXFP4/MXFP8 and plain FP16 with MXFP16. The accuracy,
+                       memory,andthroughputconsequencesofthis trajectory are reported in the next three subsections.
+                       4.3   Accuracy:ÿ as a Reliable Target
+                       Therelative factorization error across the four con昀椀gurations and four tolerances is reported in Figure 4. Given the
+                       allocation patterns of Section 4.2, the accuracy outcomes follow directly.
+                                                                                                                               Manuscript submitted to ACM
+                             14                                                                Abdurakhmanov,Mary,Ltaief, Keyes, and Fahmy
+                                Baseline overshoots its own tolerance. At ÿ = 10−5, the baseline delivers a factorization error of order 10−4 across all
+                             three tested matrix sizes42.97×10−4 at Ċ = 32k, 3.00×10−4 at Ċ = 40k, and 1.86×10−4 at Ċ = 64k4overshooting the
+                             requested tolerance by a factor of roughly 30×. The mechanism is the FP8 band of Section 4.2: the baseline admits tiles
+                             to FP8 by the rounding-only test, but at FP8 a non-negligible fraction of entries under昀氀ows, and the actual error is
+                             dominated by this under昀氀ow contribution. The overshoot persists across the tested grid, reaching ∼60× at ÿ = 10−6,
+                             andevenatÿ =10−8 the Baseline still exceeds the requested tolerance by more than an order of magnitude, since the
+                             rounding-only test continues to admit some FP8 tiles whose under昀氀ow contribution dominates the error.
+                                The ladder con昀椀gurations track ÿ closely. Ladder IEEE delivers errors at or modestly above ÿ across every (Ċ,ÿ)
+                             pair because it eliminates the FP8 band (Section 4.2) and pays the cost in higher-tier tiles. Ladder MX and Ladder
+                             MX+MXFP16also track ÿ closely, despite admitting cheaper sub-byte tiers the baseline cannot reach safely: the
+                             shared scale absorbs the local dynamic range so MXFP4 and MXFP8 tiles satisfy the admissibility test on regions of the
+                             matrix where plain FP8 fails. At ÿ = 10−5 Ladder MX + MXFP16 reaches 4.47 × 10−6 at Ċ = 64k4a 41.6× reduction
+                             relative to the Baseline at the same (Ċ,ÿ), achieved by changing only the format in the low-precision slot. The largest
+                             overshoot for Ladder occurs at ÿ = 10−7 (factors of 6.7 to 10.5 across the tested matrix sizes), where FP32’s unit roundo昀昀
+                             īFP32 ≈ 1.19 × 10−7 sits essentially at the target tolerance: FP32 tiles narrowly pass admissibility rather than being
+                             pushed to FP64, and their accumulated edge-of-budget contribution drives the overshoot. This behaves like a step
+                             function acrossīFP324looser tolerances have slack, tighter ones (ÿ < īFP32) force FP64 promotion.
+                                Fromheuristic guideline to reliable target. Under the baseline rule, ÿ functions as a heuristic guideline: the assignment
+                             satis昀椀es a rounding-only test, but the actual error may substantially exceed ÿ4by more than an order of magnitude at
+                             loose tolerances4when under昀氀ow dominates. Under any of the three ladder con昀椀gurations, ÿ functions as a reliable
+                             target: the per-tile representation error is provably bounded by ÿ∥ý∥ (Section 3.1.5), and the factorization error tracks ÿ
+                             closely, exceeding it by at most a small constant factor at the operating point where the per-tile budget is fully utilized.
+                             Theladder does not claim a strict factorization-error bound4the per-tile theorem of Section 3.1.5 does not propagate as
+                             one4butturnsÿ from a number the baseline can overshoot by an order of magnitude into one the ladder respects to
+                             within a small factor across every tested (Ċ,ÿ) pair.
+                             4.4   MemoryFootprint
+                             L-factor memory footprint by tile format is shown in Figure 5. The allocation patterns translate directly into memory:
+                             Ladder IEEE’s promotion of FP8 and FP16 tiles to FP32 quadruples and doubles their per-element cost, respectively,
+                             while Ladder MX’s MXFP4 substitution halves it.
+                                Ladder IEEE costs memory; Ladder MX partially recovers; Ladder MX + MXFP16 saves. Ladder IEEE shifts mass upward:
+                             at Ċ = 120k, ÿ = 10−5, the FP32 count grows from 128 to 255 (+127), absorbing both promoted FP8 tiles (249 → 177)
+                             and most former FP16 tiles (58 → 3). The result is a memory footprint that grows substantially relative to the Baseline
+                             at the same tolerance. Ladder MX places tiles at sub-byte storage again via MXFP4 (4.25 bits per element including
+                             amortized scale metadata) and MXFP8 (8.25 bits), with MXFP4 absorbing a substantial fraction of what the Baseline
+                             placed at FP84halving the per-element cost on those tiles4though FP32 promotion of former mid-tier tiles keeps total
+                             memoryabovetheBaseline. Ladder MX + MXFP16 shifts some tiles previously at FP32 in Ladder MX down to MXFP16
+                             storage, bringing memory below the Baseline while enabling the throughput recovery reported in Section 4.5.
+                             Manuscript submitted to ACM
+                                    Error-Controlled MxP Cholesky Factorization with Microscaling                                                                                                                                              15
+                                                                           FP64              FP32              FP16               MXFP16                 FP8 plain              MXFP8                 MXFP4
+                                                                                                                                                                                          27
+                                                                                                                                                                                                                                          28
+                                                                                                                                         26
+                                                                                         25
+                                                                                                                                                                                 ·=10
+                                                                                                                                                                                                                                 ·=10
+                                                                                                                                 ·=10
+                                                                                ·=10
+                                           30
+                                           20
+                                        Memory (GB)10
+                                            0          Base   L. IEEE    L. MX L. MX+16                 Base   L. IEEE    L. MX L. MX+16                Base   L. IEEE    L. MX L. MX+16                Base   L. IEEE    L. MX L. MX+16
+                                    Fig. 5. Memory footprint (GB) of the lower-triangular factor at Ċ = 120k (Ĥ                                                 =4096)for the four configurations across tolerances
+                                                                                                                                                             Ę
+                                    ÿ. Stacked bars decompose memory by tile-format bucket (bo琀琀om-to-top: FP64, FP32, FP16, MXFP16, FP8 plain, MXFP8, MXFP4).
+                                    Diagonal tiles are at FP64 in all configurations.
+                                         Quantitative comparison at large Ċ. At Ċ = 120k,Ĥ = 4096, Ladder MX + MXFP16 ranges from 14.34 GB atÿ = 10−5
+                                                                                                                                  Ę
+                                    to 27.46 GB at ÿ = 10−8. Compared to the Baseline at ÿ = 10−5 (15.58 GB), Ladder MX + MXFP16 saves roughly 8% of
+                                    L-factor memory while delivering the accuracy guarantee the Baseline overshoots. The savings come from the MXFP4
+                                    substitution at the cheap tier: of the 249 tiles the Baseline places at FP8 plain (8 bits per element), 180 drop to MXFP4
+                                    (4.25 bits per element including amortized scale) under the ladder4halving the per-element cost on those tiles4while
+                                    68 move to MXFP8 (8.25 bits) at approximately the same cost as plain FP8. The savings shrink as ÿ tightens (5.5% at
+                                    ÿ = 10−6, 3.0% at ÿ = 10−7, 2.1% at ÿ = 10−8) because the MXFP4 population shrinks as more tiles are pushed up the
+                                    ladder. The savings against Ladder IEEE are substantially larger: 30.6% at ÿ = 10−5 (20.67 GB) and 13.8% at ÿ = 10−8
+                                    (31.84 GB), re昀氀ecting Ladder IEEE’s full memory cost of FP32 promotion. Holding the full L factor (lower triangle
+                                    including diagonal) at FP64 would require 56.3 GB; at ÿ = 10−7 Ladder MX + MXFP16 uses 22.11 GB, or 39% of this
+                                    all-FP64 reference.
+                                         E昀昀ect of tolerance. As ÿ tightens, the precision distribution in every con昀椀guration shifts upward and memory
+                                    grows. The shift is most pronounced at the transition from ÿ = 10−5 to 10−6, where the cheapest tiers yield to
+                                    FP16/MXFP8/MXFP16.Atÿ =10−8 mostofthematrixisatFP32orabove,andthegapbetweenBaselineandLadder
+                                    MX+MXFP16narrows;LadderIEEEandLadderMXremainnoticeablyhigherbecausetheircandidatesetscannot
+                                    capture all the precision savings available to the full ladder.
+                                    4.5       ThroughputandtheAccuracy3ThroughputTrade-o昀昀
+                                    Factorization throughput is reported in Figure 6. The progression Baseline → Ladder IEEE → Ladder MX → Ladder
+                                    MX+MXFP16mirrorstheallocation arc of Section 4.2, telling a three-step recovery story. At Ċ = 120k, ÿ = 10−5:
+                                    the Baseline reaches its peak of ∼158 TFLOPS (at the cost of the error overshoot reported in Section 4.3), falling
+                                    monotonically to ∼76 TFLOPS atÿ = 10−8; Ladder IEEE drops to ∼87 TFLOPS (∼55% of Baseline), as eliminating the
+                                    cheap-tier and most mid-tier IEEE candidates shifts mass to FP32; Ladder MX recovers to ∼115 TFLOPS (∼73%) via
+                                    MXFP4andMXFP8,withtheremaininggapre昀氀ectingthemid-tiervacancyofSection4.2:whenplainFP16failsthe
+                                    admissibility test, Ladder MX has no scaled mid-tier candidate and must escalate to FP32; Ladder MX + MXFP16 reaches
+                                    ∼156TFLOPS(within∼2%ofBaseline),昀椀lling the mid tier via MXFP16’s TF32 path while delivering the accuracy of the
+                                                                                                                                                                                                         Manuscript submitted to ACM
+                                                            16                                                                                                                                   Abdurakhmanov,Mary,Ltaief, Keyes, and Fahmy
+                                                                                                                             Baseline               Ladder IEEE                 Ladder MX                  Ladder MX+MXFP16
+                                                                                                                                                                                                  27
+                                                                                                                                                                                                                                                        28
+                                                                                                                                            26
+                                                                                      25
+                                                                                                                                                                                         ·=10
+                                                                                                                                                                                                                                               ·=10
+                                                                                                                                   ·=10
+                                                                             ·=10
+                                                                    150
+                                                                    100
+                                                                     50
+                                                                 Perf (TFLOPS)
+                                                                       0
+                                                                        20k       40k      60k      80k                       20k       40k      60k      80k                       20k       40k      60k      80k                        20k      40k      60k      80k
+                                                                                                            100k      120k                                         100k     120k                                         100k     120k                                         100k     120k
+                                                                                         Matrix size  N                                        Matrix size  N                                         Matrix size  N                                        Matrix size  N
+                                                            Fig. 6. Factorization throughput (TFLOPS) vs. matrix size Ċ for the four configurations, with one panel per tolerance ÿ. Throughput
+                                                            obtained on a single NVIDIA GB200 GPU using 4 CUDA streams per device.
+                                                            other ladders and the memory savings of Section 4.4. With cheap-tier throughput restored, the factorization bottleneck
+                                                            shifts from low-precision GEMMs onto residual FP64 panel operations.
+                                                                 The accuracy3throughput trade-o昀昀. Together, Figure 6 and the accuracy results in Figure 4 characterize the trade-o昀昀
+                                                            each con昀椀guration o昀昀ers. The Baseline reaches the highest throughput but at a factorization error that exceeds the
+                                                            requestedÿ byupto∼60×acrossthetestedgridandstillbymorethananorderofmagnitudeatÿ =10−8;thethroughput
+                                                            peak comes with no guarantee on the actual accuracy delivered. Ladder IEEE enforces the bound but pays a substantial
+                                                            throughput cost, since the only IEEE candidates available below FP32 (FP8 and FP16) cannot pass the admissibility
+                                                            test once under昀氀ow becomes visible, so most of the matrix falls onto the FP32 path. Ladder MX recovers cheap-tier
+                                                            throughput by admitting MXFP4 and MXFP8 at the same admissibility bound, but the mid-tier vacancy keeps it short
+                                                            of the Baseline’s throughput level. Ladder MX + MXFP16 closes both gaps simultaneously: it matches the Baseline’s
+                                                            throughput within ∼2% at the loose-tolerance operating point while delivering the same accuracy guarantee as the
+                                                            other two ladder con昀椀gurations. At intermediate tolerances (ÿ = 10−6, 10−7) the three con昀椀gurations approach parity in
+                                                            measured factorization error, and Ladder MX + MXFP16’s advantage is its provable enforcement of the per-tile bound
+                                                            (Section 3.1.5) rather than an empirical accuracy gain. We note that the ladder’s pre-analysis is more expensive than the
+                                                            Baseline’s rounding-only rule due to the per-candidate entrywise scan (Section 3.1.5). Its relative cost falls as Ċ grows,
+                                                            since the scan is O(|P|Ċ2) against O(Ċ3) factorization, and it is paid once per matrix rather than once per operation.
+                                                            The scan is also independent across tiles and across candidates within a tile, so it parallelizes in both dimensions;
+                                                            because the left-looking traversal consumes tiles in a known order, the analysis of later panels can in principle overlap
+                                                            with the factorization of earlier ones. A characterization of an optimized implementation is left to future work.
+                                                            5 ConclusionsandFutureWork
+                                                            Thispaperpresentedanerror-controlledladderforper-tileprecisionassignmentintile-centricmixed-precisionCholesky
+                                                            factorization, exploiting microscaling formats. The ladder decomposes the per-tile error into rounding and under昀氀ow
+                                                            contributions, walks an ordered candidate list from cheapest to most expensive in storage cost, and admits the 昀椀rst
+                                                            candidate that satis昀椀es a uni昀椀ed admissibility test against the user-requested tolerance ÿ. Integrating block-scaled MX
+                                                            formats (MXFP4 and MXFP8) and MXFP16 as ladder candidates extends the framework beyond IEEE storage classes:
+                                                            Manuscript submitted to ACM
+                    Error-Controlled MxP Cholesky Factorization with Microscaling                                                17
+                    the shared per-block scale absorbs the local dynamic range that causes plain low-precision formats to fail the test,
+                    restoring throughput at the cheap and mid tiers without sacri昀椀cing the accuracy bound.
+                      Experimental evaluation on a single NVIDIA GB200 GPU shows that the ladder turns ÿ from a heuristic guideline4
+                   whichthebaseline rule of [17] can overshoot up to ∼60× when under昀氀ow dominates the actual error4into a reliable
+                    target tracked closely across all tested operating points. Among the three ladder instantiations, Ladder MX + MXFP16
+                    delivers up to 1.79× speedup over Ladder IEEE alone (155.6 vs 87.0 TFLOPS at Ċ=120k, ÿ=10−5), reduces L-factor
+                    memoryfootprint by roughly 30% over Ladder IEEE, and matches the Baseline’s peak throughput within ∼2% while
+                    enforcing the same accuracy guarantee as the other ladder con昀椀gurations. To our knowledge, this is the 昀椀rst study to
+                    evaluate MX formats (down to MXFP4) as working storage-and-compute precisions in dense matrix factorization.
+                      There are several directions for extending this work. The present evaluation focuses on Cholesky factorization of
+                   weak-correlation 2D Matérn covariance matrices. The combination of error-controlled tile assignment and block-scaled
+                    formats is not speci昀椀c to Cholesky4it operates on any tile-centric workload where rounding and under昀氀ow can be
+                    bounded per tile4so testing the ladder on other dense matrix algorithms (LU, QR, eigensolvers, and tile low-rank
+                    variants) would establish whether the recovery story observed here generalizes across the broader linear algebra
+                    landscape. Likewise, extending the analysis to medium and strong correlation regimes and to 3D Matérn kernels for
+                    volumetric geospatial data would test the ladder under di昀昀erent tile-norm structures, with relevance to atmospheric
+                    andoceanographic modeling.
+                      Theframeworkitself opens up a design space that this paper only partially explores. The scaling granularity is 昀椀xed
+                    at the OCP MX block (ġ=32); a systematic comparison across granularities (tile-level, intermediate, and MX) would
+                    characterize the accuracy3metadata trade-o昀昀. Similarly, the error model treats FZ and GU uniformly (Section 3.1.1) but
+                    the experimental evaluation uses GU exclusively; a head-to-head FZ-vs-GU comparison would quantify whether the
+                    simpler FZ mode su昀케ces in practice.
+                    Acknowledgments
+                   We would like to thank NVIDIA for providing remote access to the GB200 NVL4 GPU system. Theo Mary was
+                    partially supported by projects managed by the French National Research Agency (ANR): France 2030 NumPEx Exa-MA
+                    (ANR-22-EXNU-0002), MixHPC (ANR-23-CE46-0005), and FPT-4 (ANR-24-CE46-7572).
+                    References
+                    [1] AhmadAbdelfattah, Hartwig Anzt, Erik G Boman, Erin Carson, Terry Cojean, Jack Dongarra, Alyson Fox, Mark Gates, Nicholas J Higham, Xiaoye S
+                        Li, Jennifer Loe, Piotr Luszczek, Srikara Pranesh, Siva Rajamanickam, Tobias Ribizel, Barry F Smith, Kasia Swirydowicz, Stephen Thomas, Stanimire
+                        Tomov, Yaohung M Tsai, and Ulrike Meier Yang. 2021. A Survey of Numerical Linear Algebra Methods Utilizing Mixed-Precision Arithmetic. The
+                        International Journal of High Performance Computing Applications 35, 4 (2021), 3443369. doi:10.1177/10943420211003313
+                    [2] Ahmad Abdelfattah, Stan Tomov, and Jack Dongarra. 2020. Investigating the Bene昀椀t of FP16-Enabled Mixed-Precision Solvers for Symmetric
+                        Positive De昀椀nite Matrices Using GPUs. In Computational Science 3 ICCS 2020, Valeria V. Krzhizhanovskaya, Gábor Závodszky, Michael H. Lees,
+                        Jack J. Dongarra, Peter M. A. Sloot, Sérgio Brissos, and João Teixeira (Eds.). Vol. 12138. 2373250. doi:10.1007/978-3-030-50417-5_18
+                    [3] Sameh Abdulah, Allison H. Baker, George Bosilca, Qinglei Cao, Stefano Castruccio, Marc G. Genton, David E. Keyes, Zubair Khalid, Hatem Ltaief,
+                        Yan Song, Georgiy L. Stenchikov, and Ying Sun. 2024. Boosting Earth System Model Outputs And Saving PetaBytes in Their Storage Using Exascale
+                        Climate Emulators. In Proceedings of the International Conference for High Performance Computing, Networking, Storage, and Analysis (Atlanta, GA,
+                        USA)(SC’24). IEEE Press, Article 2, 12 pages. doi:10.1109/SC41406.2024.00008
+                    [4] Sameh Abdulah, Hatem Ltaief, Ying Sun, Marc G. Genton, and David E. Keyes. 2018. ExaGeoStat: A High Performance Uni昀椀ed Software for
+                        Geostatistics on Manycore Systems. IEEE Transactions on Parallel and Distributed Systems 29, 12 (2018), 277132784. doi:10.1109/TPDS.2018.2850749
+                    [5] Abdurauf Abdurakhmanov and Suhaib A. Fahmy. 2025. Exploring Microscaling MX Mini昀氀oat Systolic Arrays on FPGAs. ACM Transactions on
+                        Recon昀椀gurable Technology and Systems 18, 4 (2025), 1323. doi:10.1145/3773041
+                                                                                                            Manuscript submitted to ACM
+                18                                  Abdurakhmanov,Mary,Ltaief, Keyes, and Fahmy
+                 [6] Victoria Carrica, Rabab Alomairy, Evelyne Ringoot, and Alan Edelman. 2026. Hierarchical Precision and Recursion for Accelerating Symmetric
+                   Linear Solves on MXUs. arXiv:2601.08082 [cs.DC] doi:10.48550/arXiv.2601.08082
+                 [7] Stef Cuyckens, Xiaoling Yi, Nitish Satya Murthy, Chao Fang, and Marian Verhelst. 2025. E昀케cient Precision-Scalable Hardware for Microscaling
+                   (MX) Processing in Robotics Learning. In IEEE/ACM International Symposium on Low Power Electronics and Design (ISLPED). 137. doi:10.1109/
+                   ISLPED65674.2025.11261796
+                 [8] Bita Darvish Rouhani, Daniel Lo, Ritchie Zhao, Ming Liu, Jeremy Fowers, Kalin Ovtcharov, Anna Vinogradsky, Sarah Massengill, Lita Yang, Ray
+                   Bittner, Alessandro Forin, Haishan Zhu, Taesik Na, Prerak Patel, Shuai Che, Lok Chand Koppaka, XIA SONG, Subhojit Som, Kaustav Das, Saurabh
+                   T, Steve Reinhardt, Sitaram Lanka, Eric Chung, and Doug Burger. 2020. Pushing the Limits of Narrow Precision Inferencing at Cloud Scale with
+                   Microsoft Floating Point. In Advances in Neural Information Processing Systems, H. Larochelle, M. Ranzato, R. Hadsell, M. F. Balcan, and H. Lin (Eds.),
+                   Vol. 33.
+                 [9] Sean Fox, Seyedramin Rasoulinezhad, Julian Faraone, David Boland, and Philip Leong. 2021. A Block Mini昀氀oat Representation for Training Deep
+                   Neural Networks. (2021).
+                [10] Azzam Haidar, Harun Bayraktar, Stanimire Tomov, Jack Dongarra, and Nicholas J. Higham. 2020. Mixed-Precision Iterative Re昀椀nement Using
+                   Tensor Cores on GPUs to Accelerate Solution of Linear Systems. Proceedings of the Royal Society A: Mathematical, Physical and Engineering Sciences
+                   476, 2243 (2020), 20200110. doi:10.1098/rspa.2020.0110
+                [11] Nicholas J. Higham and Theo Mary. 2022. Mixed Precision Algorithms in Numerical Linear Algebra. Acta Numerica 31 (2022), 3473414. doi:10.1017/
+                   s0962492922000022
+                [12] Nicholas J. Higham, Srikara Pranesh, and Mawussi Zounon. 2019. Squeezing a Matrix into Half Precision, with an Application to Solving Linear
+                   Systems. SIAM Journal on Scienti昀椀c Computing 41, 4 (2019), A25363A2551. doi:10.1137/18M1229511
+                [13] Hatem Ltaief, Rabab Alomairy, Qinglei Cao, Jie Ren, Lot昀椀 Slim, Thorsten Kurth, Benedikt Dorschner, Salim Bougou昀昀a, Rached Abdelkhalak, and
+                   David E. Keyes. 2024. Toward Capturing Genetic Epistasis From Multivariate Genome-Wide Association Studies Using Mixed-Precision Kernel
+                   Ridge Regression. In Proceedings of the International Conference for High Performance Computing, Networking, Storage, and Analysis (Atlanta, GA,
+                   USA)(SC’24). IEEE Press, Article 6, 12 pages. doi:10.1109/SC41406.2024.00012
+                [14] Theo Mary and Mantas Mikaitis. 2025. Error Analysis of Matrix Multiplication with Narrow Range Floating-Point Arithmetic. SIAM Journal on
+                   Scienti昀椀c Computing 47, 4 (2025), B7853B800. doi:10.1137/24M1685109
+                [15] Alessio Netti, Yang Peng, Patrik Omland, Michael Paulitsch, Jorge Parra, Gustavo Espinosa, Udit Agarwal, Abraham Chan, and Karthik Pattabiraman.
+                   2023. Mixed Precision Support in HPC Applications: What about Reliability? J. Parallel and Distrib. Comput. 181 (2023), 104746. doi:10.1016/j.jpdc.
+                   2023.104746
+                [16] Katsuhisa Ozaki, Takeshi Ogita, Shin’ichi Oishi, and Siegfried M. Rump. 2012. Error-Free Transformations of Matrix Multiplication by Using Fast
+                   Routines of Matrix Multiplication and Its Applications. Numerical Algorithms 59, 1 (2012), 953118. doi:10.1007/s11075-011-9478-1
+                [17] Jie Ren, Hatem Ltaief, Sameh Abdulah, and David E Keyes. 2025. Accelerating Mixed-Precision Out-of-Core Cholesky Factorization with Static Task
+                   Scheduling. In ISC High Performance Computing (40th International Conference). Prometeus GmBH. doi:10.23919/ISC.2025.11017733
+                [18] Bita Darvish Rouhani, Nitin Garegrat, Tom Savell, Ankit More, Kyung-Nam Han, Ritchie Zhao, Mathew Hall, Jasmine Klar, Eric Chung, Yuan Yu,
+                   Michael Schulte, Ralph Wittig, Ian Bratt, Nigel Stephens, Jelena Milanovic, John Brothers, Pradeep Dubey, Marius Cornea, Alexander Heinecke,
+                   AndresRodriguez,MartinLanghammer,SummerDeng,MaximNaumov,PauliusMicikevicius,MichaelSiu,andColinVerrilli.2023. OCPMicroscaling
+                   Formats (MX) Speci昀椀cation v1.0. https://www.opencompute.org/documents/ocp-microscaling-formats-mx-v1-0-spec-昀椀nal-pdf
+                [19] Bita Darvish Rouhani, Ritchie Zhao, Ankit More, Mathew Hall, Alireza Khodamoradi, Summer Deng, Dhruv Choudhary, Marius Cornea, Eric
+                   Dellinger, Kristof Denolf, Stosic Dusan, Venmugil Elango, Maximilian Golub, Alexander Heinecke, Phil James-Roxby, Dharmesh Jani, Gaurav Kolhe,
+                   Martin Langhammer, Ada Li, Levi Melnick, Maral Mesmakhosroshahi, Andres Rodriguez, Michael Schulte, Rasoul Sha昀椀pour, Lei Shao, Michael Siu,
+                   Pradeep Dubey, Paulius Micikevicius, Maxim Naumov, Colin Verrilli, Ralph Wittig, Doug Burger, and Eric Chung. 2023. Microscaling Data Formats
+                   for Deep Learning. arXiv preprint arXiv:2310.10537.
+                [20] Ebby Samson, Naveen Mellempudi, Wayne Luk, and George A. Constantinides. 2024. Exploring FPGA Designs for MX and Beyond. In Proceedings of
+                   International Conference on Field-Programmable Logic and Applications (FPL). IEEE. doi:10.1109/FPL64840.2024.00049
+                [21] James Hardy Wilkinson. 1963. Rounding errors in algebraic processes. SIAM.
+                [22] Qiao Zhang, Rabab Alomairy, Dali Wang, Zhuowei Gu, and Qinglei Cao. 2025. Leveraging Hardware-Aware Computation in Mixed-Precision Matrix
+                   Multiply: A Tile-Centric Approach. In Asynchronous Many-Task Systems and Applications: Third International Workshop, WAMTA 2025, St. Louis, MO,
+                   USA, February 19321, 2025, Proceedings (St. Louis, MO, USA). Springer-Verlag, Berlin, Heidelberg, 1743185. doi:10.1007/978-3-031-97196-9_15
+                Manuscript submitted to ACM

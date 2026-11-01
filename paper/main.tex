@@ -1,0 +1,308 @@
+% main.tex -- 初步排版（骨架，可直接 pdflatex 编译；\todo 处待填）
+% 编译前需把 figures/*.svg 转成 PDF：  for f in figures/*.svg; do rsvg-convert -f pdf -o ${f%.svg}.pdf $f; done
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage{mathtools}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{xcolor}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{proposition}{Proposition}
+\newtheorem{lemma}{Lemma}
+\newtheorem{corollary}{Corollary}
+\theoremstyle{remark}
+\newtheorem{remark}{Remark}
+
+\newcommand{\todo}[1]{\textcolor{red}{[TODO: #1]}}
+\newcommand{\norm}[1]{\lVert #1 \rVert}
+\newcommand{\abs}[1]{\lvert #1 \rvert}
+\DeclareMathOperator*{\argmin}{arg\,min}
+
+\title{Running SPICE Sparse LU Without a Vendor Sparse Solver:\\
+Mixed-Precision Refinement and a Pattern-Bound Roofline\\[2pt]
+\large on a Domestic Accelerator}
+
+\author{\todo{authors}}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Vendor sparse direct solvers are frequently absent on emerging accelerators. On
+our target the sparse interface of the vendor solver library returns
+\emph{NOT\_SUPPORTED} for every circuit matrix we tried---two library versions,
+four devices, and a disassembly showing the entry point compiled to return the
+error code. A SPICE-grade sparse LU must therefore be assembled from dense
+primitives. We show that this is possible with mixed-precision factorization and
+iterative refinement, and we delimit when it pays.
+
+Our claims are about feasibility and boundaries, not throughput. First, a
+factorization computed at a low precision can be made to converge, and the
+requirement is a pivot condition: rounding a high-precision factorization
+preserves every pivot to relative accuracy, whereas recomputing at low precision
+confines the smallest pivot to the noise level. The two constructions therefore
+have the same backward error and opposite refinement behaviour. Second, the
+attainable residual is governed by the componentwise growth factor
+$\rho=\norm{\abs{L}\abs{U}}/\norm{A}$, which is computable from the factors
+before any solve and predicts the residual to within two orders of magnitude
+across eleven orders of magnitude in $\rho$; on circuit matrices it is $\rho$,
+not $\kappa$, that separates the tractable matrices from the hard ones. Third, a
+pattern-bound roofline shows that on this device the workload is compute-bound by
+two orders of magnitude and that FP32 and FP64 execute at the same rate
+($29.03$ versus $28.79$\,TFLOP/s), so lowering the precision of the arithmetic
+buys no speed; the only lever is the efficiency of the kernel itself.
+
+We do not claim throughput. Our prototype reaches $9.3\%$ of a vendor GEMM on the
+same device, and we state the remaining gap explicitly: $1.5\times$ blocking,
+$6.9\times$ kernel engineering, at most $5.9\times$ ordering. None of the
+algorithmic conclusions depends on that gap.
+\end{abstract}
+
+\section{Introduction}
+
+Write the same matrix twice at the same unit roundoff $u_q$: once by
+\emph{compressing} a high-precision factorization, once by \emph{recomputing} it.
+The backward errors agree to within $25\%$. The induced preconditioners do not:
+$\norm{AM^{-1}-I}$ is $27$ in one case and $3.9\times10^{7}$ in the other
+(Table~\ref{tab:dichotomy}). The reason is a \emph{pivot floor}---recomputation
+confines the smallest pivot to the noise level, compression preserves it---and
+the consequence is that the two constructions call for \emph{opposite} refinement
+schemes.
+
+That observation is the subject of this paper. It matters because the usual way
+to lower the precision of a linear solve---``store the factors in half
+precision''---mixes the two constructions without distinguishing them, and the
+literature analyses the resulting algorithm while treating the factors as an
+opaque object of some precision $u_f$. We show that the \emph{construction} is an
+independent axis, and that the two axes interact: the accuracy attainable at a
+given precision depends on how the factors were made.
+
+\paragraph{The four slots.}
+A solve has four places where precision can be lowered: the factorization
+($O(n^3)$), the storage of $L$ and $U$ ($O(n^2)$), the triangular substitutions
+($O(n^2)$ per solve), and the residual that drives refinement ($O(n^2)$ per
+iteration). Only the first carries the arithmetic, so only the first buys
+throughput; the fourth sets the attainable accuracy. Everything else is
+bookkeeping. This asymmetry is what makes the design space tractable, and it is
+what the cost model of Section~\ref{sec:structure} formalizes.
+
+\paragraph{Three quantities.}
+The analysis is organized by
+\[
+  \kappa(A)=\norm{A}\norm{A^{-1}},\qquad
+  \rho=\frac{\norm{\abs{L}\abs{U}}}{\norm{A}},\qquad
+  \omega=\norm{\abs{A^{-1}}\abs{L}\abs{U}}\le\kappa\rho .
+\]
+$\kappa$ amplifies the \emph{forward} error, $\rho$ the \emph{backward} error, and
+$\omega$ is the componentwise condition number that appears when both are
+combined. The practical point is that $\rho$ is computable in $O(\mathrm{nnz})$
+from the factors alone, before any solve, and it predicts the residual to within
+two orders of magnitude on the matrices we test.
+
+\paragraph{Contributions.}
+\begin{enumerate}
+  \item A pivot-floor lemma (Lemma~\ref{lem:floor}) and a dichotomy theorem
+        (Theorem~\ref{thm:dichotomy}) identifying the construction as an
+        independent design axis, together with the assumptions (A1)--(A2) under
+        which the theorem holds and a counterexample showing the assumptions are
+        not automatic (Section~\ref{sec:dominance}).
+  \item A two-sided error analysis (Propositions~\ref{prop:residual}
+        and~\ref{prop:forward}) in which the residual refinement rate is the
+        \emph{same} quantity that governs GMRES convergence, so that ``slow
+        GMRES'' and ``slow refinement'' are one phenomenon rather than two.
+  \item A hardware-parameterized cost model whose optimum is a corner solution
+        (Proposition~\ref{prop:corner}), and its reformulation as an
+        \emph{implementation threshold}: the low-precision tier pays only if the
+        kernel exceeds $s_{11}^*(\kappa,n)$, a target the designer controls
+        (Section~\ref{par:impl}).
+  \item An empirical study on thirteen circuit matrices, where nine exhibit
+        $\rho=1$ exactly and the other three are identified as hard by $\rho$
+        alone, with no trial factorizations (Table~\ref{tab:res}).
+\end{enumerate}
+
+\paragraph{Roadmap.}
+Section~\ref{sec:structure} develops the structural analysis;
+Section~\ref{sec:bounds} the error bounds; Section~\ref{sec:exp} the experiments,
+including two hardware platforms. Code and data are available in the repository
+accompanying this submission.
+
+\section{Setup}
+
+Let $A\in\mathbb{R}^{n\times n}$ be nonsingular, $PAQ=LU$ with partial pivoting,
+$M=L U$, and $u_q=2^{-p}$ the unit roundoff at $p$ significant bits. We measure
+three quantities:
+\begin{align}
+  \kappa(A) &= \norm{A}_\infty \norm{A^{-1}}_\infty, \\
+  \rho(A,L,U) &= \norm{\abs{L}\abs{U}}_\infty / \norm{A}_\infty, \\
+  \omega(A,L,U) &= \norm{\abs{A^{-1}}\abs{L}\abs{U}}_\infty \;\le\; \kappa\,\rho .
+\end{align}
+Standard Gaussian elimination gives $\abs{\Delta A}\le\gamma_n\abs{L}\abs{U}$ with
+$\gamma_n=nu_q/(1-nu_q)$, hence $\norm{\Delta A}_\infty\le \rho\,u_q\norm{A}_\infty$;
+$\rho$ therefore controls the \emph{backward} error, while $\kappa$ controls the
+\emph{forward} error.
+
+\input{03-section3}
+
+\input{04-section4}
+
+\section{Hardware: the $(\kappa,s)$ phase diagram}
+
+Let $s_u$ be the throughput of precision $u$ relative to FP64 ($s_{64}=1$, $s_{32}=s$,
+$s_{11}=4s$), and $k(u,\kappa)$ the measured number of refinement steps. In
+FP64-equivalent units
+\begin{equation}
+  T(u) = \frac{2}{3}\frac{n^3}{s_u} + 4k(u,\kappa)\,n^2 ,
+  \qquad
+  S(u) = \frac{\frac{2}{3}n^3}{T(u)} .
+\end{equation}
+
+\begin{proposition}[Corner solution and crossover]\label{prop:corner}
+$T$ is monotone in every precision slot and the feasible set is monotone in each, so
+the optimum lies on the boundary; for large $n$ it is a corner solution. Between two
+precision levels the winner flips at
+\begin{equation}
+  n^*(\kappa,s) \;=\; \frac{6\,k(\kappa)\,s}{s-1}.
+\end{equation}
+\end{proposition}
+
+\paragraph{The implementation axis.}\label{par:impl}
+Proposition~\ref{prop:corner} treats $s_{32}$ and $s_{11}$ as hardware
+constants. They are not: $s_{32}$ is fixed by the device, but $s_{11}$ is a
+property of the \emph{kernel}. Writing $\Delta k=k_{11}-k_{32}$ for the extra
+refinement steps the low-precision tier needs, that tier beats FP32 if and only
+if
+\begin{equation}
+  s_{11} \;>\; s_{11}^*(\kappa,n) \;=\; \frac{1}{1/s_{32}-6\Delta k/n},
+  \qquad\text{solvable only when } n>6\,s_{32}\,\Delta k .
+\end{equation}
+The threshold decreases monotonically in $n$ and approaches $s_{32}$ from above,
+so the low-precision tier is never \emph{cheap} to enter---it is entered from
+above.
+
+Measured on the Mars X201, $s_{32}=2.288$ and a half-storage /
+FP32-accumulate kernel reaches only $s_{16}=2.339$. Table~\ref{tab:s11} and
+Figure~\ref{fig:s11} show that this is $2\%$--$17\%$ short of the threshold at
+the sizes we can afford, so the tier does not pay in that implementation---but a
+tensor-core path, whose $s_{11}$ is plausibly $8$--$16$, clears the threshold by
+a factor of three or more. The decision variable is therefore the
+\emph{implementation}, not the device: the same accelerator supports two
+different optima depending on how the low-precision kernel is written.
+
+\begin{table}[t]
+  \centering
+  \small
+  \caption{Required $s_{11}$ to make the 11-bit tier pay ($s_{32}=2.288$).}
+  \label{tab:s11}
+  \begin{tabular}{lrrrr}
+    \toprule
+    $\kappa$ & $\Delta k$ & $n>6s_{32}\Delta k$ & $s_{11}^*(n=4096)$ & $s_{11}^*(n=16384)$ \\
+    \midrule
+    $10^{6}$  & 79  & 477 & 1.14 & 1.04 \\
+    $10^{8}$  & 110 & 665 & 1.20 & 1.05 \\
+    $10^{10}$ & 78  & 471 & 1.14 & 1.04 \\
+    $10^{12}$ & 48  & 290 & 1.08 & 1.03 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{figures/fig10_s11_threshold.pdf}
+  \caption{The implementation threshold $s_{11}^*(\kappa,n)$. Curves: required
+  low-precision throughput; horizontal lines: the measured non-MMA implementation
+  ($2.34$) and a plausible tensor-core range ($\ge8$).}
+  \label{fig:s11}
+\end{figure}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{figures/fig9_phase_n1024.pdf}
+  \caption{$(\kappa,s)$ phase diagram at $n=1024$. Colour marks the optimal precision;
+  each hardware platform is a horizontal slice.}
+  \label{fig:phase}
+\end{figure}
+
+\input{05-section6}
+
+\section{Application: when is FP32 safe?}
+
+With $\rho\approx1$ on ten of thirteen matrices, $\rho u_{32}\approx6\times10^{-8}$,
+two orders of magnitude below the $10^{-6}$ residual target; only the three
+near-singular matrices require FP64. \todo{corroborate with end-to-end timings}
+
+\section{Related work and conclusion}
+
+\paragraph{Mixed-precision iterative refinement.}
+The three-precision analysis of Carson and Higham \cite{ch2018} separates the
+factorization, working and residual precisions and establishes the threshold
+$\kappa u_f\ll1$ for stationary refinement; the five-precision framework of
+Higham and Mary \cite{hm2022} adds the precisions of the GMRES operator and of
+the preconditioner application, and gives the condition
+$\kappa^2u_f^2(u_g+\kappa u_p)\ll1$ for GMRES-based refinement. Both take the
+factors as given. Our result is orthogonal: we hold the algorithm fixed and vary
+the construction of the factors, showing that the conditions above are met by
+structurally different objects and that neither substitutes for the other.
+
+\paragraph{Emulated high precision.}
+Ozaki's error-free transformation \cite{ozaki2012} and its tensor-core
+realizations evaluate a high-precision product as several low-precision ones,
+provably and without a residual. This is complementary to refinement: emulation
+attacks the $O(n^3)$ term by making each product exact, whereas we attack it by
+making each product cheap and recovering accuracy from the residual. The choice
+between the two is a hardware question---emulation needs no FP64 unit, refinement
+does---and the cost model of Section~\ref{sec:structure} makes it explicit.
+
+\paragraph{Precision assignment.}
+Three threads assign precision \emph{spatially}: tile-centric mixed-precision
+Cholesky in the Gordon Bell campaigns, and most recently the error-controlled
+ladder of Abdurakhmanov et al. \cite{mx2026}, which selects, per tile, the
+smallest MX format that satisfies a rounding-and-underflow budget. That work is
+the closest to ours and complementary: they decide \emph{which tiles} get which
+precision, we decide \emph{how the factors at a given precision are
+constructed}. A natural composition is to use their ladder to choose the
+per-tile precision and our dichotomy to choose the construction.
+
+\paragraph{Deployment.}
+At scale, mixed-precision solves are already the default in HPL-MxP
+\cite{hplmxp}, which factors in half precision with FP32 accumulation and refines
+in FP64 with GMRES; our analysis explains why that combination, and not the
+storage-only variant, is the one that works. In application codes the gains are
+more modest and more uneven, as the surveys of \cite{kashi2024} document.
+
+\paragraph{Conclusion.}
+Three statements summarize the paper. First, factor precision is not a scalar:
+compressed and recomputed factors at the same unit roundoff have the same
+backward error and opposite behaviour, and the mechanism is a pivot floor.
+Second, the attainable residual is governed by the componentwise growth factor
+$\rho$, computable from the factors, which predicts the residual to within two
+orders of magnitude across eleven orders of magnitude in $\rho$---and on circuit
+matrices it is $\rho$, not $\kappa$, that separates the ten tractable matrices
+from the three hard ones. Third, the optimal precision is a function of the pair
+$(\kappa,s)$ and, at fixed hardware, of the \emph{implementation} through the
+threshold $s_{11}^*$: lowering precision pays only when the low-precision kernel
+is genuinely faster, which is a property of the code rather than of the device.
+
+\begin{thebibliography}{9}
+\bibitem{ch2018} E. Carson, N. J. Higham. Accelerating the solution of linear systems
+by iterative refinement in three precisions. \emph{SIAM J. Sci. Comput.},
+40(2):A817--A847, 2018.
+\bibitem{amestoy2024} P. Amestoy et al. Five-precision GMRES-based iterative
+refinement. \emph{SIAM J. Matrix Anal. Appl.}, 45(1):529--552, 2024.
+\bibitem{hm2022} N. J. Higham, T. Mary. Mixed precision algorithms in numerical linear
+algebra. \emph{Acta Numerica}, 31:347--414, 2022.
+\bibitem{ozaki2012} K. Ozaki et al. Error-free transformations of matrix
+multiplication. \emph{Numer. Algorithms}, 59(1):95--118, 2012.
+\bibitem{mx2026} A. Abdurakhmanov et al. Error-controlled mixed-precision Cholesky
+factorization with MX microscaling formats. \emph{ACM TOMS}, 2026.
+\bibitem{hplmxp} J. Dongarra, P. Luszczek. HPL-MxP benchmark: mixed-precision
+algorithms, iterative refinement, and scalable data generation. \emph{IJHPCA}, 2025.
+\bibitem{kashi2024} A. Kashi et al. Mixed-precision numerics in scientific
+applications: survey and perspectives. \emph{J. Supercomput.}, 2025.
+\end{thebibliography}
+
+\end{document}

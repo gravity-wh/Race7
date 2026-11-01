@@ -1,0 +1,20 @@
+预提交包发布自检  2026-10-28 14:47:07
+----------------------------------------------
+PASS  task1/run.sh 存在且可执行
+PASS  A146: task1/GLU_public/src/lu_cmd 可执行
+PASS  A146: task1/GLU_public/src/test_lu_gpu 可执行
+PASS  task1/README.md 存在
+PASS  task1/regularize_singular.py 存在
+PASS  task2/run.sh 存在且可执行
+PASS  A146: task2/CUSPICE_public/local/ngspice 可执行
+PASS  GPU 二进制 ngspice.bin 存在
+PASS  CPU 兜底二进制可执行
+PASS  task2/README.md 存在
+PASS  报告含 GPU 利用率实测段
+PASS  报告标注任务一 13/13
+PASS  S4 平台限制说明存在
+PASS  MANIFEST 全部哈希校验通过
+PASS  报告无硬编码家目录路径
+----------------------------------------------
+文件数: 10191   大小: 283M
+FAIL 数: 0
