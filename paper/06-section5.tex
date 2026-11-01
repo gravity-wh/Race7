@@ -1,0 +1,155 @@
+% 06-section5.tex -- §5 重写：pattern-bound Roofline（相图降级为 5.5）
+\section{Boundary: a pattern-bound roofline}\label{sec:roofline}
+
+The cost of a sparse factorization is set by its \emph{pattern}, not by $n$: the
+fill determines both the arithmetic and the traffic, so the usual roofline
+x-axis is a function of the elimination order. We make that dependence explicit
+and use it to decide what the remaining levers are.
+
+\subsection{Arithmetic intensity of a factorization}
+
+For a factorization with $\mathrm{nnz}(L+U)=f$ nonzeros, the dominant work is
+the rank-$b$ updates; counting $8$ bytes per factor entry and $4$ per index,
+\begin{equation}
+  \mathrm{AI}(A,\mathcal{O}) \;=\; \frac{\mathrm{flops}(A,\mathcal{O})}{12\,f(A,\mathcal{O})},
+  \qquad f = f(A,\mathcal{O}),\label{eq:ai}
+\end{equation}
+where $\mathcal{O}$ is the ordering. Because $f$ is the numerator of the fill
+ratio and appears in the denominator of the intensity, \emph{choosing an ordering
+moves the operating point horizontally}: $\mathrm{AI}\propto 1/f$ at fixed work.
+This is the ``pattern-bound'' part: the roofline position is a property of the
+elimination, not of the matrix alone.
+
+\subsection{Where the points land on this device}
+
+On the Mars X201 we measure $B=1.45$\,TB/s with a stream kernel and
+$P=29.03$\,TFLOP/s with the vendor dense GEMM (\texttt{hcBLAS}, $n=4096$), giving
+a ridge point of
+\begin{equation}
+  \mathrm{AI}^\ast \;=\; P/B \;=\; 20\ \text{FLOP/byte}.
+\end{equation}
+For the thirteen circuit matrices the intensity computed from \eqref{eq:ai} is
+$10^{3}$--$10^{4}$ FLOP/byte, \emph{two orders of magnitude to the right of the
+ridge}. Every matrix is therefore squarely compute-bound, and the bandwidth roof
+plays no role at this problem size.
+
+\subsection{Precision is not a speed lever here}
+
+A compute-bound regime is exactly where lower precision is supposed to pay---but
+only if the low-precision arithmetic is actually faster. On this device it is
+not:
+\begin{center}
+\small
+\begin{tabular}{lrr}
+  \toprule
+  kernel & throughput & ratio to FP64 \\
+  \midrule
+  \texttt{hcBLAS} DGEMM & $28.79$\,TFLOP/s & $1.000$ \\
+  \texttt{hcBLAS} SGEMM & $29.03$\,TFLOP/s & $1.008$ \\
+  our naive shared-memory GEMM, FP64 & $1.24$\,TFLOP/s & $0.043$ \\
+  our naive shared-memory GEMM, FP32 & $2.82$\,TFLOP/s & $0.098$ \\
+  \bottomrule
+\end{tabular}
+\end{center}
+At vendor efficiency $s_{32}=1.008$: there is \emph{no} FP32-over-FP64 compute
+advantage. The factor-of-$2.29$ that a naive kernel suggests is an artifact of
+that kernel being limited to $875$\,GB/s of element throughput in FP32 while its
+FP64 variant reaches $1446$\,GB/s---a bandwidth effect, not a compute one.
+Consequently lowering the arithmetic precision cannot shorten the factorization
+on this device; only a genuinely faster arithmetic path (tensor cores) or a
+better kernel can.
+
+\subsection{The cost model and its corner solution}\label{sec:cost}
+
+Hold the algorithm fixed and let $s_u$ be the throughput of precision $u$
+relative to FP64 and $k(\kappa)$ the refinement count. In FP64-equivalent units
+the cost of a solve is
+\begin{equation}\label{eq:cost}
+  T(u) \;=\; \frac{1}{s_u}\,\frac{2n^{3}}{3} \;+\; 4k(\kappa)\,n^{2},
+\end{equation}
+the first term being the factorization and the second the refinement. Both
+summands are monotone decreasing in $s_u$ over the feasible set, and the feasible
+set is monotone in each slot, so the optimum is attained at a \emph{corner}: one
+uses the fastest admissible precision for the factorization and the highest
+admissible for the residual.
+
+\begin{proposition}[Corner solution and crossover]\label{prop:corner}
+Between two precisions with ratios $s$ and $s'$ and refinement counts $k<k'$,
+$T$ is minimised by the cheaper per-flop option up to
+\begin{equation}
+  n^{\ast}(\kappa) \;=\; \frac{6\,(k'-k)\,s\,s'}{s'-s},
+\end{equation}
+beyond which the faster arithmetic wins despite the extra iterations.
+\end{proposition}
+
+\begin{proof}
+Set $T(s)=T(s')$ in \eqref{eq:cost} and solve for $n$; the quadratic terms cancel
+and the linear system in $n$ gives the stated root. Monotonicity of the feasible
+set gives the corner property.
+\end{proof}
+
+\begin{remark}
+Equation~\eqref{eq:cost} is the reason the feasibility question of
+Section~\ref{sec:bounds} and the boundary question of this section are separate:
+the first two terms of \eqref{eq:cost} are unaffected by whether the refinement
+converges, and the convergence condition of Theorem~\ref{thm:dichotomy} involves
+only $\kappa$ and $u_q$.
+\end{remark}
+
+\subsection{When a low-precision tier would pay}\label{par:impl}
+
+The analysis above says that at $s_{32}=1.008$ the arithmetic precision is not a
+lever. A low-precision tier becomes one only if its throughput exceeds a
+threshold. Writing $\Delta k=k_{11}-k_{32}$, the 11-bit tier beats FP32 if and
+only if
+\begin{equation}
+  s_{11} > s_{11}^{\ast}(\kappa,n) \;=\; \frac{1}{1/s_{32}-6\Delta k/n},
+  \qquad\text{solvable only when } n>6\,s_{32}\,\Delta k .
+\end{equation}
+With the measured $s_{32}=1.008$ the thresholds collapse to $1.03$--$1.20$
+(Table~\ref{tab:s11}): the tier pays as soon as it is marginally faster than
+FP64, and the binding constraint is not the threshold but whether such a path
+exists on the device at all.
+
+\begin{table}[t]
+  \centering
+  \small
+  \caption{Required $s_{11}$ for the 11-bit tier to pay, with $s_{32}=1.008$.}
+  \label{tab:s11}
+  \begin{tabular}{lrrrr}
+    \toprule
+    $\kappa$ & $\Delta k$ & $n>6s_{32}\Delta k$ & $s_{11}^\ast(4096)$ & $s_{11}^\ast(16384)$ \\
+    \midrule
+    $10^{6}$  & 79  & 477 & 1.14 & 1.04 \\
+    $10^{8}$  & 110 & 665 & 1.20 & 1.05 \\
+    $10^{10}$ & 78  & 471 & 1.14 & 1.04 \\
+    $10^{12}$ & 48  & 290 & 1.08 & 1.03 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{figures/fig10_s11_threshold.pdf}
+  \caption{The implementation threshold $s_{11}^\ast(\kappa,n)$ at the measured
+  $s_{32}=1.008$ (grey). A tier pays when its throughput lies above the curves.}
+  \label{fig:s11}
+\end{figure}
+
+\subsection{The \texorpdfstring{\((\kappa,s)\)}{(kappa,s)} phase diagram}\label{sec:phase}
+
+For completeness we record the picture that motivated the cost model: if both
+ratios were free parameters, the optimal tier as a function of $(\kappa,s)$
+consists of regions separated by $n^{\ast}$ contours
+(Figure~\ref{fig:phase}). On the measured device the 11-bit region is empty
+because $s_{11}\approx s_{32}$; the diagram is retained as the map of what a
+device with a faster low-precision path would unlock.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.85\linewidth]{figures/fig9_phase_n4096.pdf}
+  \caption{Optimal tier as a function of $(\kappa,s)$ at $n=4096$, with
+  $s_{11}=2.34$ as measured. The FP32 and 11-bit regions are separated by the
+  $n^\ast$ contour of Proposition~\ref{prop:corner}.}
+  \label{fig:phase}
+\end{figure}
