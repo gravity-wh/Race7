@@ -205,9 +205,10 @@ agree: the median deviation is $3.4\,\mu$V, $1/300$ of the threshold, and 82 of
 100 lie below $0.1$\,mV. The single exception is a deck whose Newton iteration
 selects a different time step at one switching edge; one $60.7$\,mV spike
 survives there and averages to $2.19$\,mV. Changing the solver thus does not move
-the simulation---what moves it is step control, the same mechanism behind the
-edge-localized deviations that the $2\%$-relative checker reports even for the
-reference path.
+the simulation; what moves it is step control, and the same edge sensitivity is
+why a pointwise deviation and an edge-aware acceptance check can rank the same
+pair of traces differently---by design, the check compares the steady region
+relatively and the sensitive region absolutely.
 
 \begin{figure}[t]
   \centering
