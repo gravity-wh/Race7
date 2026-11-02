@@ -65,22 +65,29 @@ algorithmic conclusions depends on that gap.
 
 \section{Introduction}
 
-Write the same matrix twice at the same unit roundoff $u_q$: once by
-\emph{compressing} a high-precision factorization, once by \emph{recomputing} it.
-The backward errors agree to within $25\%$. The induced preconditioners do not:
-$\norm{AM^{-1}-I}$ is $27$ in one case and $3.9\times10^{7}$ in the other
-(Table~\ref{tab:dichotomy}). The reason is a \emph{pivot floor}---recomputation
-confines the smallest pivot to the noise level, compression preserves it---and
-the consequence is that the two constructions call for \emph{opposite} refinement
-schemes.
+A sparse direct solver is the wrong thing to assume. On the accelerator we
+target, the vendor library's sparse interface is not merely slow, or unimplemented
+for some inputs: its handle constructor returns \textsc{not\_supported} for every
+circuit matrix we tried, on two library versions and four devices, and a
+disassembly shows the entry point compiled to return the code, while the dense
+interface in the same library works normally. A SPICE-grade sparse LU must
+therefore be assembled from dense primitives, and the question is no longer which
+solver to call but whether an assembled path is viable at all.
 
-That observation is the subject of this paper. It matters because the usual way
-to lower the precision of a linear solve---``store the factors in half
-precision''---mixes the two constructions without distinguishing them, and the
-literature analyses the resulting algorithm while treating the factors as an
-opaque object of some precision $u_f$. We show that the \emph{construction} is an
-independent axis, and that the two axes interact: the accuracy attainable at a
-given precision depends on how the factors were made.
+This paper answers that question with a \emph{feasibility claim} and a
+\emph{boundary}, not with a throughput claim. The feasibility rests on a pivot
+condition (Section~\ref{sec:structure}): rounding a high-precision factorization
+preserves every pivot to relative accuracy, whereas recomputing at low precision
+confines the smallest pivot to the noise level. The two constructions therefore
+have the same backward error and opposite refinement behaviour---one is usable
+only with stationary refinement, the other only with GMRES. The boundary rests on
+a pattern-bound roofline (Section~\ref{sec:roofline}): the arithmetic intensity of
+a factorization is set by its fill, and on this device it lands two orders of
+magnitude to the right of the ridge point, so the workload is compute-bound and
+the bandwidth roof is irrelevant. That would normally make lower precision the
+obvious lever, except that the vendor dense GEMM runs FP32 and FP64 at the same
+rate ($29.03$ versus $28.79$\,TFLOP/s), so on this device precision is not a speed
+lever at all.
 
 \paragraph{The four slots.}
 A solve has four places where precision can be lowered: the factorization
@@ -226,17 +233,19 @@ storage-only variant, is the one that works. In application codes the gains are
 more modest and more uneven, as the surveys of \cite{kashi2024} document.
 
 \paragraph{Conclusion.}
-Three statements summarize the paper. First, factor precision is not a scalar:
-compressed and recomputed factors at the same unit roundoff have the same
-backward error and opposite behaviour, and the mechanism is a pivot floor.
-Second, the attainable residual is governed by the componentwise growth factor
-$\rho$, computable from the factors, which predicts the residual to within two
-orders of magnitude across eleven orders of magnitude in $\rho$---and on circuit
-matrices it is $\rho$, not $\kappa$, that separates the ten tractable matrices
-from the three hard ones. Third, the optimal precision is a function of the pair
-$(\kappa,s)$ and, at fixed hardware, of the \emph{implementation} through the
-threshold $s_{11}^*$: lowering precision pays only when the low-precision kernel
-is genuinely faster, which is a property of the code rather than of the device.
+Three statements summarize the paper. First, a sparse LU can be assembled on an
+accelerator whose vendor sparse interface is a stub, and it converges, provided
+the factorization is constructed so that its pivots are preserved relatively
+rather than confined by the noise floor; the refinement scheme then follows from
+the construction and not from a preference. Second, the cost boundary is
+computable before any solve: the fill fixes the arithmetic intensity, the
+intensity fixes whether the workload is compute- or bandwidth-bound, and on our
+device it is compute-bound by two orders of magnitude while FP32 and FP64 run at
+the same rate, so precision is not a performance lever here. Third, what remains
+is kernel engineering: our prototype reaches $9.3\%$ of a vendor GEMM, and the
+gap decomposes into $1.5\times$ blocking and $6.9\times$ deeper kernel work, with
+ordering contributing at most $5.9\times$. We state this headroom rather than
+claim it closed, because none of the algorithmic conclusions depends on it.
 
 \begin{thebibliography}{9}
 \bibitem{ch2018} E. Carson, N. J. Higham. Accelerating the solution of linear systems
