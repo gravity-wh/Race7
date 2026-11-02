@@ -161,6 +161,33 @@ $\rho$ therefore controls the \emph{backward} error, while $\kappa$ controls the
 
 \input{05-section6}
 
+\subsection{The absent solver}\label{sec:absent}
+
+The constraint that shapes everything that follows is that the platform provides
+no sparse direct solver. The evidence is short and reproducible.
+
+\begin{enumerate}
+  \item \texttt{hcsolverSpCreate} returns $9$,
+        \textsc{hcsolver\_status\_not\_supported}, for every circuit matrix and
+        every parameter setting we tried;
+  \item the result is unchanged after explicit device and context initialisation,
+        which rules out a missing-initialisation explanation;
+  \item two library versions and four devices agree, so it is not a regression in
+        one build;
+  \item disassembly shows \texttt{hcsolverDnCreate} with a real function body
+        while the sparse and refactorization entry points are compiled to return
+        the code unconditionally---the interface is a stub, not a runtime failure;
+  \item the fallback to an incomplete LU (\texttt{hcSPARSE}) fails as well: on our
+        circuit matrices the diagonal is incomplete and the triangular solve
+        returns \textsc{zero\_pivot}; after augmenting the diagonal the
+        factorization succeeds but the iteration diverges.
+\end{enumerate}
+
+Building the factorization ourselves is therefore not an optimization choice but
+the only available path. What remains open is whether the path is numerically
+viable, the subject of Sections~\ref{sec:structure} and~\ref{sec:bounds}, and
+where its cost sits, the subject of Section~\ref{sec:roofline}.
+
 \section{Application: when is FP32 safe?}
 
 With $\rho\approx1$ on ten of thirteen matrices, $\rho u_{32}\approx6\times10^{-8}$,
